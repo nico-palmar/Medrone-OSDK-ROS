@@ -43,12 +43,44 @@ public:
 
 private:
 
+    geographic_msgs::GeoPoint localToGlobalGoal(const geographic_msgs::GeoPoint& curr_pos, const geometry_msgs::Point& rel_goal_pos)
+    {
+        // Convert the anchor GPS to a geodesy UTM point
+        geodesy::UTMPoint curr_utm;
+        geodesy::fromMsg(curr_pos, curr_utm);
+
+        // Create a new UTM point with the offset applied
+        geodesy::UTMPoint utm_target;
+        utm_target.easting  = curr_utm.easting + rel_goal_pos.x;  // East direction
+        utm_target.northing = curr_utm.northing + rel_goal_pos.y; // North direction
+        utm_target.altitude = curr_utm.altitude + rel_goal_pos.z; // Altitude change
+        utm_target.zone     = curr_utm.zone;
+        utm_target.band     = curr_utm.band;
+
+        // Convert back to GPS (lat, lon, alt)
+        const geographic_msgs::GeoPoint target_gps = geodesy::toMsg(utm_target);
+
+        return target_gps;
+    }
+
     void goalCB()
     {
         const auto goal_ptr = as_.acceptNewGoal();
         if (goal_ptr != nullptr)
         {
-            goal_pos_ = goal_ptr->goal_position;
+            if (goal_ptr->relative)
+            {
+                // translate from a local, relative goal
+                // to a absolute global goal
+                // require the local position, so set a flag to update on first callback
+                update_goal_ = true;
+                relative_goal_pos_ = goal_ptr->rel_goal_position;
+            }
+            else
+            {
+                // absolute positioning; the goal is already correct
+                goal_pos_ = goal_ptr->abs_goal_position;
+            }
         }
         else
         {
@@ -90,7 +122,7 @@ private:
 
         // Calculate NED offsets
         Eigen::Vector3d ned_error { target_utm.northing - ref_utm.northing, target_utm.easting - ref_utm.easting, -(target_position.altitude - current_position.altitude) };
-        ROS_DEBUG_STREAM("The NED Error is N: " << ned_error.x() << ", E: " << ned_error.y() << " D: " << ned_error.z());
+        // ROS_DEBUG_STREAM("The NED Error is N: " << ned_error.x() << ", E: " << ned_error.y() << " D: " << ned_error.z());
         return ned_error;
     }
 
@@ -117,13 +149,21 @@ private:
     void gpsPosCallback(const sensor_msgs::NavSatFix::ConstPtr& msg)
     {
         if (!as_.isActive())
+        {
             return;
+        }
 
-        curr_pos_ = navSatFixtoGeoPoint(*msg);
+        const auto curr_pos = navSatFixtoGeoPoint(*msg);
+        if (update_goal_)
+        {
+            // a relative goal has been created without an update on the global goal location
+            goal_pos_ = localToGlobalGoal(curr_pos, relative_goal_pos_);
+            update_goal_ = false;
+        }
 
         // run the control loop
         // calculate the error from the current position to the goal
-        const auto ned_error = getNEDError(curr_pos_, goal_pos_);
+        const auto ned_error = getNEDError(curr_pos, goal_pos_);
 
         // calculate the velocity required and cap it at the saturation
         Eigen::Vector3d ned_velocity = Kp.array() * ned_error.array();
@@ -178,10 +218,10 @@ private:
     actionlib::SimpleActionServer<osdk::MoveToWaypointAction> as_;
     std::string action_name_;
     geographic_msgs::GeoPoint goal_pos_;
+    geometry_msgs::Point relative_goal_pos_;
+    bool update_goal_ { false };
     osdk::MoveToWaypointResult result_;
     osdk::MoveToWaypointFeedback feedback_;
-
-    geographic_msgs::GeoPoint curr_pos_;
 
     // gain for each axis... x, y, and z
     const Eigen::Vector3d Kp { 0.9, 0.9, 0.9 };

@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
         ROS_INFO_STREAM("Sending waypoint. Latitude: " <<  waypoints[i].latitude << ", Longitude: " << waypoints[i].longitude << ", Altitude: " << waypoints[i].altitude);
         
         osdk::MoveToWaypointGoal goal;
-        goal.goal_position = waypoints[i];
+        goal.abs_goal_position = waypoints[i];
 
         ac.sendGoal(goal);
 

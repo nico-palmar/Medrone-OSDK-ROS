@@ -1,7 +1,10 @@
 # MoveToWaypoint.action
 
-# Goal, the desired waypoint to move to
-geographic_msgs/GeoPoint goal_position
+# flag which determines the goal type
+bool relative
+
+geometry_msgs/Point rel_goal_position
+geographic_msgs/GeoPoint abs_goal_position
 
 ---
 # Result definition
