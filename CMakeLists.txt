@@ -211,6 +211,7 @@ add_action_files(
   FILES
   AltitudeControl.action
   MoveToWaypoint.action
+  Mission.action
 )
 
 ## Generate added messages and services with any dependencies listed here

@@ -12,5 +12,4 @@ bool success
 string message
 
 ---
-# Feedback: current GPS position
-geographic_msgs/GeoPoint curr_position
+int32 n_waypoint

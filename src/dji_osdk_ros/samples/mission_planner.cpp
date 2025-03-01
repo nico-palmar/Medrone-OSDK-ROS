@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <actionlib/server/simple_action_server.h>
-#include <dji_osdk_ros/Mission.h>
+#include <actionlib/client/simple_action_client.h>
+#include <dji_osdk_ros/MissionAction.h>
 #include <dji_osdk_ros/common_type.h>
 #include <string>
 #include <geodesy/utm.h>
@@ -12,6 +13,7 @@
 #include <dji_osdk_ros/ObtainControlAuthority.h>
 #include <dji_osdk_ros/GetAvoidEnable.h>
 #include <Eigen/Dense>
+#include <dji_osdk_ros/MoveToWaypointAction.h>
 
 namespace osdk = dji_osdk_ros;
 
@@ -28,10 +30,10 @@ public:
         ac_("waypoint_control", true)
     {
         task_control_client_ = nh_.serviceClient<osdk::FlightTaskControl>("/flight_task_control");;
-        enable_horizon_avoid_client_ = nh.serviceClient<osdk::SetAvoidEnable>("/set_horizon_avoid_enable");
-        enable_upward_avoid_client_ = nh.serviceClient<osdk::SetAvoidEnable>("/set_upwards_avoid_enable");
-        get_avoid_enable_client_ = nh.serviceClient<osdk::GetAvoidEnable>("get_avoid_enable_status");
-        obtain_ctrl_authority_client_ = nh.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
+        enable_horizon_avoid_client_ = nh_.serviceClient<osdk::SetAvoidEnable>("/set_horizon_avoid_enable");
+        enable_upward_avoid_client_ = nh_.serviceClient<osdk::SetAvoidEnable>("/set_upwards_avoid_enable");
+        get_avoid_enable_client_ = nh_.serviceClient<osdk::GetAvoidEnable>("get_avoid_enable_status");
+        obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
         as_.start();
         ROS_INFO("Mission Planner Action Server started");
     }
@@ -43,7 +45,7 @@ public:
         if (!validMission(goal))
         {
             std::string err_msg = "The specified mission is not valid; must increase in altitude and only be " + std::to_string(goal->max_distance) + " km away at most";
-            ROS_ERROR(err_msg);
+            ROS_ERROR("%s", err_msg.c_str());
             result_.success = false;
             result_.message = err_msg;
             as_.setAborted(result_, err_msg);
@@ -54,12 +56,12 @@ public:
         osdk::ObtainControlAuthority obtain_ctrl_authority;
   
         obtain_ctrl_authority.request.enable_obtain = true;
-        obtain_ctrl_authority_client.call(obtain_ctrl_authority);
+        obtain_ctrl_authority_client_.call(obtain_ctrl_authority);
 
         if (obtain_ctrl_authority.response.result == false)
         {
             std::string err_msg = "Failed to obtain autonomous control";
-            ROS_ERROR(err_msg);
+            ROS_ERROR("%s", err_msg.c_str());
             result_.success = false;
             result_.message = err_msg;
             as_.setAborted(result_, err_msg);
@@ -70,17 +72,22 @@ public:
         osdk::FlightTaskControl control_task;
         control_task.request.task = osdk::FlightTaskControl::Request::TASK_TAKEOFF;
         ROS_INFO("Takeoff request sending ...");
-        task_control_client.call(control_task);
+        // TODO: Figure out what happens if we send this but already took off
+        task_control_client_.call(control_task);
 
         if (control_task.response.result == false)
         {
             std::string err_msg = "Takeoff failed!";
-            ROS_ERROR(err_msg);
+            ROS_ERROR("%s", err_msg.c_str());
             result_.success = false;
             as_.setAborted(result_, err_msg);
             return;
         }
         ROS_INFO("Takeoff successful, proceed to mission planner");
+
+        ROS_INFO("Waiting for action server to start");
+        ac_.waitForServer();
+        ROS_INFO("Action server started, sending waypoints.");
 
         const auto waypoints = createWaypoints(goal);
 
@@ -94,9 +101,8 @@ public:
                 return;
             }
 
-            // Send feedback
-            // TODO: consider updating the feedback to something else
-            feedback_.current_position = waypoint;
+            ROS_INFO("Reached waypoint %ld", i + 1);
+            feedback_.n_waypoint = i+1;
             as_.publishFeedback(feedback_);
 
             // Check if the action has been preempted
@@ -104,6 +110,7 @@ public:
                 ROS_INFO("Mission preempted");
                 // consider returning to home here
                 as_.setPreempted();
+                ac_.cancelAllGoals();
                 return;
             }
         }
@@ -207,7 +214,7 @@ private:
 
         goal_ned_error_ = getNEDError(curr_pos, goal_pos);
 
-        const auto goal_distance = ned_error.norm();
+        const auto goal_distance = goal_ned_error_.norm();
 
         if (goal_distance > goal->max_distance)
         {
@@ -216,7 +223,7 @@ private:
 
         // check that the drone isn't moving down from  the current position
         // assume valid missions must go up to avoid crashing
-        if (ned_error.z() > 0)
+        if (goal_ned_error_.z() > 0)
         {
             // down error is positive; drone wants to go down
             return false;
@@ -226,7 +233,23 @@ private:
 
     bool navigateToWaypoint(const geometry_msgs::Point& waypoint)
     {
-        // TODO: use the action server to navigate to a waypoint
+        osdk::MoveToWaypointGoal goal;
+        goal.relative = true;
+        goal.rel_goal_position.x = waypoint.x;
+        goal.rel_goal_position.y = waypoint.y;
+        goal.rel_goal_position.z = waypoint.z;
+
+        ac_.sendGoal(goal);
+        const auto finished_before_timeout = ac_.waitForResult(ros::Duration(SINLGE_WAYPOINT_TIMEOUT_S));
+
+        if (!finished_before_timeout)
+        {
+            ROS_ERROR("Timed out waiting for action server to reach waypoint");
+            return false;
+        }
+
+        const auto waypoint_result = ac_.getResult();
+        return waypoint_result->success;
     }
 
     ros::NodeHandle nh_;
@@ -250,6 +273,8 @@ private:
     const int N_WAYPOINTS { 3 };
     // the flight altitude of the drone
     const double FLYING_ALTITUDE_M { 20.0 };
+
+    const double SINLGE_WAYPOINT_TIMEOUT_S { 60.0 };
 
 };
     
