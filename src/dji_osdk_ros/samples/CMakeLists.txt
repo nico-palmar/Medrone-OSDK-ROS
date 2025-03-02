@@ -18,6 +18,13 @@ if(ENABLE_DARKNET_ROS)
 add_definitions(-DUSE_DARKNET_ROS)
 endif()
 
+add_executable(test_gpio
+        test_manifold_gpio.cpp)
+target_link_libraries(test_gpio
+        ${PROJECT_NAME}
+)
+add_dependencies(test_gpio dji_osdk_ros_generate_messages_cpp)
+
 add_executable(flight_control_node
                flight_control_node.cpp)
 target_link_libraries(flight_control_node
