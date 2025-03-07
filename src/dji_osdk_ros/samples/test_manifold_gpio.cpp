@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 
     // Set parameters for GPIO control
     // remove the line below if it works; its for PWM
-    // io_service.request.action = osdk::MFIO::Request::TURN_ON;  // Turn the GPIO pin ON
+    io_service.request.action = osdk::MFIO::Request::TURN_ON;  // Turn the GPIO pin ON
     io_service.request.mode = osdk::MFIO::Request::MODE_GPIO_OUT;  // GPIO output mode
     // TODO: ensure the channel is configured properly in the dji assistant 2
     io_service.request.channel = 0;  // Specify which GPIO channel (0-7)
@@ -37,6 +37,7 @@ int main(int argc, char** argv)
     ros::Duration(0.5).sleep();
 
     // To turn OFF the GPIO pin
+    io_service.request.action = osdk::MFIO::Request::TURN_OFF;
     io_service.request.gpio_value = 0; 
 
     if (client.call(io_service))
