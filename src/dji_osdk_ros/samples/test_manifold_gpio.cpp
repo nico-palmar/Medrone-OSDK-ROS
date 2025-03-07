@@ -9,7 +9,7 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
 
     // Create a service client for the 'mfio_control' service
-    ros::ServiceClient client = nh.serviceClient<osdk::MFIO>("mfio_control");
+    ros::ServiceClient client = nh.serviceClient<osdk::MFIO>("/mfio_control");
 
     // Prepare the service request and response
     osdk::MFIO io_service;
@@ -47,8 +47,6 @@ int main(int argc, char** argv)
     {
         ROS_ERROR_STREAM("Failed to call service mfio_control");
     }
-
-    ros::spin();
 
     return 0;
 }
