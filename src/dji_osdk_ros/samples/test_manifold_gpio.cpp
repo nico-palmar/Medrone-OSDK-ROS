@@ -48,5 +48,7 @@ int main(int argc, char** argv)
         ROS_ERROR_STREAM("Failed to call service mfio_control");
     }
 
+    ros::spin();
+
     return 0;
 }
