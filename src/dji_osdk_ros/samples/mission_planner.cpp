@@ -14,12 +14,21 @@
 #include <dji_osdk_ros/GetAvoidEnable.h>
 #include <Eigen/Dense>
 #include <dji_osdk_ros/MoveToWaypointAction.h>
+#include <std_msgs/UInt8.h>
 
 namespace osdk = dji_osdk_ros;
 
 namespace impulse_control
 {
-    
+
+enum FlightStatus
+{
+    ON_GROUND = 0,
+    TAKING_OFF = 1,
+    FLYING = 2,
+    LANDING = 3
+};
+
 // Define the Action Server class
 class MissionPlannerActionServer
 {
@@ -44,13 +53,14 @@ public:
         // validate the mission
         if (!validMission(goal))
         {
-            std::string err_msg = "The specified mission is not valid; must increase in altitude and only be " + std::to_string(goal->max_distance) + " km away at most";
+            std::string err_msg = "The specified mission is not valid";
             ROS_ERROR("%s", err_msg.c_str());
             result_.success = false;
             result_.message = err_msg;
             as_.setAborted(result_, err_msg);
             return;
         }
+        ROS_INFO("Mission is valid; proceeding");
 
         // obtain the control authority
         osdk::ObtainControlAuthority obtain_ctrl_authority;
@@ -68,22 +78,55 @@ public:
             return;
         }
 
+        ROS_INFO("Obtained control authority, proceeding");
 
-        osdk::FlightTaskControl control_task;
-        control_task.request.task = osdk::FlightTaskControl::Request::TASK_TAKEOFF;
-        ROS_INFO("Takeoff request sending ...");
-        // TODO: Figure out what happens if we send this but already took off
-        task_control_client_.call(control_task);
+        // check the flight status
+        const auto flight_status_msg = ros::topic::waitForMessage<std_msgs::UInt8>("dji_osdk_ros/flight_status", nh_, ros::Duration(5.0));
 
-        if (control_task.response.result == false)
+        if (!flight_status_msg)
         {
-            std::string err_msg = "Takeoff failed!";
+            // message did not get recieved - unaware of flight status. Fail out
+            std::string err_msg = "Failed to get flight status";
             ROS_ERROR("%s", err_msg.c_str());
             result_.success = false;
+            result_.message = err_msg;
             as_.setAborted(result_, err_msg);
             return;
         }
-        ROS_INFO("Takeoff successful, proceed to mission planner");
+
+        const auto flight_msg = static_cast<FlightStatus>(flight_status_msg->data);
+
+        if (flight_msg == ON_GROUND)
+        {
+            osdk::FlightTaskControl control_task;
+            control_task.request.task = osdk::FlightTaskControl::Request::TASK_TAKEOFF;
+            ROS_INFO("Takeoff request sending ...");
+            task_control_client_.call(control_task);
+
+            if (control_task.response.result == false)
+            {
+                std::string err_msg = "Takeoff failed!";
+                ROS_ERROR("%s", err_msg.c_str());
+                result_.success = false;
+                as_.setAborted(result_, err_msg);
+                return;
+            }
+            ROS_INFO("Takeoff successful, proceed to mission planner");
+        }
+        else if (flight_msg == FLYING)
+        {
+            ROS_INFO("Drone is already flying, proceed");
+        }
+        else
+        {
+            // message did not get recieved - unaware of flight status. Fail out
+            std::string err_msg = "Unexpected drone status: " + std::to_string(flight_msg);
+            ROS_ERROR("%s", err_msg.c_str());
+            result_.success = false;
+            result_.message = err_msg;
+            as_.setAborted(result_, err_msg);
+            return;
+        }
 
         ROS_INFO("Waiting for action server to start");
         ac_.waitForServer();
@@ -184,9 +227,9 @@ private:
 
         // Create a new UTM point with the offset applied
         geodesy::UTMPoint utm_target;
-        utm_target.easting  = curr_utm.easting + rel_goal_pos.x;  // East direction
-        utm_target.northing = curr_utm.northing + rel_goal_pos.y; // North direction
-        utm_target.altitude = curr_utm.altitude + rel_goal_pos.z; // Altitude change
+        utm_target.northing  = curr_utm.northing + rel_goal_pos.x;
+        utm_target.easting = curr_utm.easting + rel_goal_pos.y;
+        utm_target.altitude = curr_utm.altitude + rel_goal_pos.z;
         utm_target.zone     = curr_utm.zone;
         utm_target.band     = curr_utm.band;
 
@@ -200,6 +243,12 @@ private:
     {
         // validate altitude isn't lower than the starting position
         const auto msg = ros::topic::waitForMessage<sensor_msgs::NavSatFix>("dji_osdk_ros/gps_position", nh_, ros::Duration(gps_timeout_s));
+        if (!msg)
+        {
+            // no position was recieved in the timeout
+            ROS_ERROR("No GPS position was published in the timeout");
+            return false;
+        }
         const auto curr_pos = navSatFixtoGeoPoint(*msg);
 
         geographic_msgs::GeoPoint goal_pos;
@@ -218,6 +267,7 @@ private:
 
         if (goal_distance > goal->max_distance)
         {
+            ROS_ERROR_STREAM("The distance to the goal was greater than the allowable distance of " << std::to_string(goal->max_distance) << " meters");
             return false;
         }
 
@@ -226,6 +276,7 @@ private:
         if (goal_ned_error_.z() > 0)
         {
             // down error is positive; drone wants to go down
+            ROS_ERROR("A valid mission cannot make the drone move downwards!");
             return false;
         }
         return true;

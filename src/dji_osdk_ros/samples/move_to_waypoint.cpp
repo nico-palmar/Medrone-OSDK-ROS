@@ -51,8 +51,8 @@ private:
 
         // Create a new UTM point with the offset applied
         geodesy::UTMPoint utm_target;
-        utm_target.easting  = curr_utm.easting + rel_goal_pos.x;  // East direction
-        utm_target.northing = curr_utm.northing + rel_goal_pos.y; // North direction
+        utm_target.northing  = curr_utm.northing + rel_goal_pos.x;
+        utm_target.easting = curr_utm.easting + rel_goal_pos.y;
         utm_target.altitude = curr_utm.altitude + rel_goal_pos.z; // Altitude change
         utm_target.zone     = curr_utm.zone;
         utm_target.band     = curr_utm.band;
