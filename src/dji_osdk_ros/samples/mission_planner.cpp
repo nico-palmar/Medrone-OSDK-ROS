@@ -81,7 +81,7 @@ public:
         ROS_INFO("Obtained control authority, proceeding");
 
         // check the flight status
-        const auto flight_status_msg = ros::topic::waitForMessage<std_msgs::UInt8>("dji_osdk_ros/flight_status", nh_, ros::Duration(5.0));
+        const auto flight_status_msg = ros::topic::waitForMessage<std_msgs::UInt8>("dji_osdk_ros/flight_status", nh_, ros::Duration(TOPIC_TIMEOUT_S));
 
         if (!flight_status_msg)
         {
@@ -239,10 +239,10 @@ private:
         return target_gps;
     }
 
-    bool validMission(const osdk::MissionGoalConstPtr& goal, const float gps_timeout_s = 5.0)
+    bool validMission(const osdk::MissionGoalConstPtr& goal)
     {
         // validate altitude isn't lower than the starting position
-        const auto msg = ros::topic::waitForMessage<sensor_msgs::NavSatFix>("dji_osdk_ros/gps_position", nh_, ros::Duration(gps_timeout_s));
+        const auto msg = ros::topic::waitForMessage<sensor_msgs::NavSatFix>("dji_osdk_ros/gps_position", nh_, ros::Duration(TOPIC_TIMEOUT_S));
         if (!msg)
         {
             // no position was recieved in the timeout
@@ -324,9 +324,8 @@ private:
     const int N_WAYPOINTS { 3 };
     // the flight altitude of the drone
     const double FLYING_ALTITUDE_M { 20.0 };
-
     const double SINLGE_WAYPOINT_TIMEOUT_S { 60.0 };
-
+    const double TOPIC_TIMEOUT_S { 5.0 };
 };
     
 
