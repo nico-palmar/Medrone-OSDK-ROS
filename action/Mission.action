@@ -4,11 +4,12 @@ bool relative
 geometry_msgs/Point rel_goal_position
 geographic_msgs/GeoPoint abs_goal_position
 
+int32 max_distance
+
 ---
 # Result definition
 bool success
 string message
 
 ---
-# Feedback: Euclidean distance to the goal
-float32 dist_to_goal
+int32 n_waypoint

@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find dji_osdk_ros)/launch/dji_vehicle_node.launch" />
+
+    <node pkg="dji_osdk_ros" type="move_to_waypoint_node" name="move_to_waypoint"/>
+    <node pkg="dji_osdk_ros" type="mission_planner_node" name="mission_server"/>
+</launch>
