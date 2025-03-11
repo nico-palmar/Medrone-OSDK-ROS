@@ -25,6 +25,12 @@ target_link_libraries(test_gpio
 )
 add_dependencies(test_gpio dji_osdk_ros_generate_messages_cpp)
 
+add_executable(test_uart
+        test_manifold_uart_comms.cpp)
+target_link_libraries(test_uart
+        ${PROJECT_NAME}
+)
+
 add_executable(flight_control_node
                flight_control_node.cpp)
 target_link_libraries(flight_control_node
