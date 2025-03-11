@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/CMakeFiles/Onboard-SDK"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/CMakeFiles/Onboard-SDK.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/CMakeFiles/Onboard-SDK-complete.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-build.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-configure.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-download.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-install.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-mkdir.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-patch.rule"
+		},
+		{
+			"file" : "/home/nico/catkin_ws/src/Onboard-SDK-ROS/cmake-modules/build/Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"Onboard-SDK"
+		],
+		"name" : "Onboard-SDK"
+	}
+}

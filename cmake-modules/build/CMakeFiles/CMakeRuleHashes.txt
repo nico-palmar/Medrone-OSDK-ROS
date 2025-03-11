@@ -1,0 +1,10 @@
+# Hashes of file build rules.
+bf6cd3e7e29547cb15eebbada9208d74 CMakeFiles/Onboard-SDK
+736182c4282a8086c6e6b28474afebd2 CMakeFiles/Onboard-SDK-complete
+eb21fa6b71fa9a62a0ca33cee8e3844e Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-build
+08078d1dcf212bb6ca7f1c8973b49362 Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-configure
+07944f466719e02ef38d31554909bef5 Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-download
+ba40d21865d2301a8ee37bf2cb7956b8 Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-install
+a6a5e2e815d0c934d8b6d6309006cf6b Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-mkdir
+2b4a9a3000bbd8eb518dc7713ddb348c Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-patch
+3ba6ff8a0e2cfb08e32838ca608ff176 Onboard-SDK-prefix/src/Onboard-SDK-stamp/Onboard-SDK-update

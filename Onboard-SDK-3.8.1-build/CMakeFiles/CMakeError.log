@@ -1,0 +1,65 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX
+
+Run Build Command(s):/usr/bin/make -f Makefile cmTC_33450/fast && make[3]: Entering directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX'
+/usr/bin/make  -f CMakeFiles/cmTC_33450.dir/build.make CMakeFiles/cmTC_33450.dir/build
+make[4]: Entering directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX'
+Building C object CMakeFiles/cmTC_33450.dir/src.c.o
+/usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD  -fPIC  -o CMakeFiles/cmTC_33450.dir/src.c.o -c /home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX/src.c
+Linking C executable cmTC_33450
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_33450.dir/link.txt --verbose=1
+/usr/bin/cc -fPIC  -rdynamic CMakeFiles/cmTC_33450.dir/src.c.o -o cmTC_33450 
+/usr/bin/ld: CMakeFiles/cmTC_33450.dir/src.c.o: in function `main':
+src.c:(.text+0x46): undefined reference to `pthread_create'
+/usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
+/usr/bin/ld: src.c:(.text+0x5e): undefined reference to `pthread_cancel'
+/usr/bin/ld: src.c:(.text+0x6f): undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+make[4]: *** [CMakeFiles/cmTC_33450.dir/build.make:99: cmTC_33450] Error 1
+make[4]: Leaving directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX'
+make[3]: *** [Makefile:127: cmTC_33450/fast] Error 2
+make[3]: Leaving directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-vZFLbX'
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY
+
+Run Build Command(s):/usr/bin/make -f Makefile cmTC_759d0/fast && make[3]: Entering directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY'
+/usr/bin/make  -f CMakeFiles/cmTC_759d0.dir/build.make CMakeFiles/cmTC_759d0.dir/build
+make[4]: Entering directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY'
+Building C object CMakeFiles/cmTC_759d0.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_759d0.dir/CheckFunctionExists.c.o -c /home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY/CheckFunctionExists.c
+Linking C executable cmTC_759d0
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_759d0.dir/link.txt --verbose=1
+/usr/bin/cc -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create -rdynamic CMakeFiles/cmTC_759d0.dir/CheckFunctionExists.c.o -o cmTC_759d0  -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+make[4]: *** [CMakeFiles/cmTC_759d0.dir/build.make:99: cmTC_759d0] Error 1
+make[4]: Leaving directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY'
+make[3]: *** [Makefile:127: cmTC_759d0/fast] Error 2
+make[3]: Leaving directory '/home/nico/catkin_ws/src/Onboard-SDK-ROS/Onboard-SDK-3.8.1-build/CMakeFiles/CMakeScratch/TryCompile-P4AvCY'
+
+
+
