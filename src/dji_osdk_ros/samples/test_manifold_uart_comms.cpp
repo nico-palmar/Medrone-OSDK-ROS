@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     }
 
     // Write data
-    char msg[] = "Hello from Manifold 2-G!";
+    char msg[] = "Hello from Manifold 2-G, ON!";
     write(serial_port, msg, strlen(msg));
     
     ROS_INFO("Sent message: %s", msg);
