@@ -5,8 +5,16 @@
 #include <cstdint>
 #include <functional>
 #include <iomanip>
+#include <actionlib/client/simple_action_client.h>
+#include <dji_osdk_ros/MissionAction.h>
+#include <geographic_msgs/GeoPoint.h>
+#include <geometry_msgs/Point.h>
+#include <dji_osdk_ros/common_type.h>
 
 // Define the function signature
+
+namespace osdk = dji_osdk_ros;
+
 using CommandHandler = std::function<void(const std::vector<uint8_t>&)>;
 
 uint32_t PASSWORD = 46000636;
@@ -33,6 +41,7 @@ struct RelativeMissionData
     double north;
     double east;
     double up;
+    double max_distance;
 };
 
 struct AbsoluteMissionData
@@ -41,6 +50,7 @@ struct AbsoluteMissionData
     double latitude;
     double longitude;
     double altitude;
+    double max_distance;
 };
 
 // Function prototypes
@@ -120,6 +130,7 @@ void handleDropTrigger(const std::vector<uint8_t>& data){
     }
     ROS_INFO("Drop command recieved; triggering");
     // TODO: Trigger a drop from here
+    // likely will send a signal to the UART node via topic, which then sends drop over uart
 }
 
 void handleAbsoluteMission(const std::vector<uint8_t>& data) {
@@ -143,7 +154,14 @@ void handleAbsoluteMission(const std::vector<uint8_t>& data) {
                     << mission_data.latitude << ", longitude=" << mission_data.longitude 
                     << ", altitude=" << std::setprecision(3) << mission_data.altitude);
     
-    // TODO: Implement absolute mission execution logic here
+    osdk::MissionGoal goal;
+    goal.relative = false;
+    goal.abs_goal_position.latitude = mission_data.latitude;
+    goal.abs_goal_position.longitude = mission_data.longitude;
+    goal.abs_goal_position.altitude = mission_data.altitude;
+    goal.max_distance = mission_data.max_distance;
+
+    // const auto mission_succeeded = runMissionServer(goal, ac);
 }
 
 void handleRelativeMission(const std::vector<uint8_t>& data) {
@@ -167,13 +185,52 @@ void handleRelativeMission(const std::vector<uint8_t>& data) {
                     << mission_data.north << ", east=" << mission_data.east 
                     << ", up=" << mission_data.up);
     
-    // TODO: Implement relative mission execution logic here
+    osdk::MissionGoal goal;
+    goal.relative = true;
+    goal.rel_goal_position.x = mission_data.north;
+    goal.rel_goal_position.y = mission_data.east;
+    goal.rel_goal_position.z = mission_data.up;
+    goal.max_distance = mission_data.max_distance;
+
+    // const auto mission_succeeded = runMissionServer(goal, ac);
+}
+
+bool runMissionServer(const osdk::MissionGoal& goal, const actionlib::SimpleActionClient<osdk::MissionAction>& ac)
+{
+    ROS_INFO("Sending mission goal to action server");
+    ac.sendGoal(goal);
+
+    // Wait for the result
+    bool finished_before_timeout = ac.waitForResult(ros::Duration(60.0));
+    
+    if (!finished_before_timeout)
+    {
+        ROS_ERROR("Timed out waiting for action server to complete mission.");
+        ac.cancelGoal();
+        return false;
+    }
+
+    const auto result = ac.getResult();
+    if (!result->success) 
+    {
+        ROS_ERROR("Mission failed: %s", result->message.c_str());
+        return false;
+    }
+
+    ROS_INFO("Mission completed successfully: %s", result->message.c_str());
+    return true;
+
 }
 
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "mobile_data_subscriber");
     ros::NodeHandle nh;
+
+    actionlib::SimpleActionClient<osdk::MissionAction> ac("mission_planner", true);
+    ROS_INFO("Waiting for action server to start...");
+    ac.waitForServer();
+    ROS_INFO("Action server started, sending waypoints.");
 
     ros::Subscriber fromMobileDataSub = nh.subscribe("dji_osdk_ros/from_mobile_data", 10, fromMobileDataSubCallback);
     
