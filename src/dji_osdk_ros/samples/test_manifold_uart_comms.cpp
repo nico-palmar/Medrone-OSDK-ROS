@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
     
     // Open serial port
-    int serial_port = open("/dev/ttyUSB0", O_RDWR);
+    int serial_port = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
     if (serial_port < 0) {
         ROS_ERROR("Error opening port: %s", strerror(errno));
         return 1;
@@ -34,15 +34,29 @@ int main(int argc, char **argv) {
     tty.c_cflag &= ~CSIZE;
     tty.c_cflag |= CS8;
 
+    // Set raw mode (disable echo, input processing)
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_oflag &= ~OPOST;
+
     // Save settings
     if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
         ROS_ERROR("Error from tcsetattr: %s", strerror(errno));
         return 1;
     }
 
+    // Flush the port
+    tcflush(serial_port, TCIOFLUSH);
+
     // Write data
     char msg[] = "Hello from Manifold 2-G, ON!";
-    write(serial_port, msg, strlen(msg));
+
+    ssize_t bytes_written = write(serial_port, msg, strlen(msg));
+    if (bytes_written < 0) {
+        ROS_ERROR("Error writing to serial port: %s", strerror(errno));
+        close(serial_port);
+        return 1;
+    }
     
     ROS_INFO("Sent message: %s", msg);
     
