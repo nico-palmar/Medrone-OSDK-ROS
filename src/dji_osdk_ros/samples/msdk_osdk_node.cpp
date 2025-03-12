@@ -44,24 +44,24 @@ public:
     }
 
     // Define data structures for incoming requests
-    struct CommandAData 
+    struct CommandAData
     {
         double test_val;
     };
 
-    struct CommandBData 
+    struct CommandBData
     {
         uint8_t flag;
         bool trigger;
     };
 
-    struct TriggerDropData 
+    struct __attribute__((packed)) TriggerDropData
     {
         uint32_t password;
         uint8_t drop_flag;
     };
 
-    struct RelativeMissionData 
+    struct __attribute__((packed)) RelativeMissionData
     {
         uint32_t password;
         double north;
@@ -70,7 +70,7 @@ public:
         double max_distance;
     };
 
-    struct AbsoluteMissionData 
+    struct __attribute__((packed)) AbsoluteMissionData
     {
         uint32_t password;
         double latitude;
@@ -90,6 +90,7 @@ private:
     const uint8_t DROP_FLAG { 42 };
 
     void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData) {
+        ROS_INFO("Recived mobile data");
         if (fromMobileData->data.empty()) {
             ROS_INFO("Received empty data from mobile");
             return;
@@ -136,7 +137,7 @@ private:
 
     void handleDropTrigger(const std::vector<uint8_t>& data) {
         if (data.size() < sizeof(TriggerDropData)) {
-            ROS_WARN("Invalid data size for Drop Trigger Command");
+            ROS_WARN_STREAM("Invalid data size for Drop Trigger Command");
             return;
         }
         TriggerDropData trigger_drop_cmd;
@@ -144,7 +145,7 @@ private:
         
         // Check the password fields for drop triggering
         if (!(trigger_drop_cmd.password == PASSWORD && trigger_drop_cmd.drop_flag == DROP_FLAG)) {
-            ROS_WARN("Invalid drop combination provided, rejecting drop request");
+            ROS_WARN_STREAM("Invalid drop combination provided, rejecting drop request. PWD " << trigger_drop_cmd.password << " and flag " << static_cast<int>(trigger_drop_cmd.drop_flag));
             return;
         }
         ROS_INFO("Drop command received; triggering");
