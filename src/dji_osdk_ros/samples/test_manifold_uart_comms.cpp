@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     tcflush(serial_port, TCIOFLUSH);
 
     // Write data
-    char msg[] = "30";
+    char msg[] = "30\n";
 
     ssize_t bytes_written = write(serial_port, msg, strlen(msg));
 
