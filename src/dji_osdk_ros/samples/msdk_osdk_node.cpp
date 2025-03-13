@@ -221,7 +221,7 @@ private:
         ac_.sendGoal(goal);
 
         // Wait for the result
-        const auto finished_before_timeout = ac_.waitForResult(ros::Duration(120.0));
+        const auto finished_before_timeout = ac_.waitForResult(ros::Duration(20.0));
         
         if (!finished_before_timeout)
         {
