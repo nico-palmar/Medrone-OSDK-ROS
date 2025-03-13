@@ -221,6 +221,7 @@ private:
         ac_.sendGoal(goal);
 
         // Wait for the result
+        // TODO: add preemption to the missions (not working)
         const auto finished_before_timeout = ac_.waitForResult(ros::Duration(200.0));
         
         if (!finished_before_timeout)

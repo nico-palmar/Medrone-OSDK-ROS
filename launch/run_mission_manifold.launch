@@ -3,4 +3,5 @@
 
     <node pkg="dji_osdk_ros" type="move_to_waypoint_node" name="move_to_waypoint"/>
     <node pkg="dji_osdk_ros" type="mission_planner_node" name="mission_server"/>
+    <node pkg="dji_osdk_ros" type="msdk_osdk_node" name="msdk_osdk_node"/>
 </launch>
