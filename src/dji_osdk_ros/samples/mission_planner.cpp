@@ -63,20 +63,20 @@ public:
         ROS_ERROR("Mission is valid; proceeding");
 
         // obtain the control authority
-        osdk::ObtainControlAuthority obtain_ctrl_authority;
+        // osdk::ObtainControlAuthority obtain_ctrl_authority;
   
-        obtain_ctrl_authority.request.enable_obtain = true;
-        obtain_ctrl_authority_client_.call(obtain_ctrl_authority);
+        // obtain_ctrl_authority.request.enable_obtain = true;
+        // obtain_ctrl_authority_client_.call(obtain_ctrl_authority);
 
-        if (obtain_ctrl_authority.response.result == false)
-        {
-            std::string err_msg = "Failed to obtain autonomous control";
-            ROS_ERROR("%s", err_msg.c_str());
-            result_.success = false;
-            result_.message = err_msg;
-            as_.setAborted(result_, err_msg);
-            return;
-        }
+        // if (obtain_ctrl_authority.response.result == false)
+        // {
+        //     std::string err_msg = "Failed to obtain autonomous control";
+        //     ROS_ERROR("%s", err_msg.c_str());
+        //     result_.success = false;
+        //     result_.message = err_msg;
+        //     as_.setAborted(result_, err_msg);
+        //     return;
+        // }
 
         ROS_ERROR("Obtained control authority, proceeding");
 
