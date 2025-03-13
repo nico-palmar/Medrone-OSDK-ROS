@@ -49,15 +49,15 @@ int main(int argc, char **argv) {
     tcflush(serial_port, TCIOFLUSH);
 
     // Write data
-    // char msg[] = "Hello from Manifold 2-G, ON!";
+    char msg[] = "30";
 
-    // ssize_t bytes_written = write(serial_port, msg, strlen(msg));
+    ssize_t bytes_written = write(serial_port, msg, strlen(msg));
 
     // Array of 8-bit numbers to send
-    uint8_t data[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+    // uint8_t data[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
 
-    // Send 8-bit numbers over UART
-    ssize_t bytes_written = write(serial_port, data, sizeof(data));
+    // // Send 8-bit numbers over UART
+    // ssize_t bytes_written = write(serial_port, data, sizeof(data));
 
     if (bytes_written < 0) {
         ROS_ERROR("Error writing to serial port: %s", strerror(errno));
