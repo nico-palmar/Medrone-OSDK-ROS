@@ -224,7 +224,7 @@ private:
     osdk::MoveToWaypointFeedback feedback_;
 
     // gain for each axis... x, y, and z
-    const Eigen::Vector3d Kp { 0.9, 0.9, 0.9 };
+    const Eigen::Vector3d Kp { 0.7, 0.7, 0.5 };
 
     // velocity saturation [m/s]
     // max magnitude of the velocity vector
