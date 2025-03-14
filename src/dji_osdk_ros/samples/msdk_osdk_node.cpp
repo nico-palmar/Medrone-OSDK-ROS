@@ -11,6 +11,8 @@
 #include <geometry_msgs/Point.h>
 #include <dji_osdk_ros/common_type.h>
 #include <std_msgs/UInt32.h>
+#include <future>
+#include <dji_osdk_ros/ObtainControlAuthority.h>
 
 namespace osdk = dji_osdk_ros;
 
@@ -35,6 +37,8 @@ public:
                                           &MobileCommandHandler::fromMobileDataSubCallback, this);
 
         drop_trigger_pub_ = nh_.advertise<std_msgs::UInt32>("drop_trigger", 1000);
+
+        obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
         
         command_handlers_ = {
             std::bind(&MobileCommandHandler::handleCommandA, this, std::placeholders::_1),
@@ -87,6 +91,7 @@ private:
     ros::Publisher drop_trigger_pub_;
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
+    ros::ServiceClient obtain_ctrl_authority_client_;
     
     // Constants
     const uint32_t MSDK_PASSWORD { 46000636 };
@@ -100,7 +105,7 @@ private:
             return;
         }
 
-        // Handle command ID
+        // Handle command IDno instance of overloaded function "std::async" matches the argument list
         uint8_t command_id = static_cast<uint8_t>(fromMobileData->data[0]);
         ROS_INFO_STREAM("Received command ID: " << static_cast<int>(command_id));
 
@@ -110,10 +115,42 @@ private:
             return;
         }
 
+        if (!testOSDKActivation())
+        {
+            ROS_ERROR("Control authority is dead; ignoring message");
+            return;
+        }
+
         CommandHandler handler = command_handlers_[command_id];
         std::vector<uint8_t> payload(fromMobileData->data.begin() + 1, fromMobileData->data.end());
 
         handler(payload);
+    }
+
+    bool callAuthorityService(osdk::ObtainControlAuthority &srv) {
+        return obtain_ctrl_authority_client_.call(srv);
+    }
+
+    bool testOSDKActivation()
+    {
+        // Call service in a separate thread
+        osdk::ObtainControlAuthority obtain_ctrl_authority;
+        obtain_ctrl_authority.request.enable_obtain = true;
+        std::future<bool> result = std::async(std::launch::async, &MobileCommandHandler::callAuthorityService, this, std::ref(obtain_ctrl_authority));
+
+        // Wait up to 10 seconds for a response
+        if (result.wait_for(std::chrono::seconds(10)) == std::future_status::ready) {
+            if (result.get()) {
+                ROS_INFO("Service response: %d", obtain_ctrl_authority.response.result);
+                return true;
+            } else {
+                ROS_ERROR("Service call failed.");
+                return false;
+            }
+        } else {
+            ROS_ERROR("Service call timed out after 10 seconds.");
+            return false;
+        }
     }
 
     void handleCommandA(const std::vector<uint8_t>& data) {
