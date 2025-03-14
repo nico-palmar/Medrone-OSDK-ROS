@@ -1,72 +1,121 @@
 #include <ros/ros.h>
+#include <std_msgs/UInt32.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <string.h>
+#include <iostream>
+#include <string>
+#include <cstring>
 
-int main(int argc, char **argv) {
-    // Initialize ROS node
-    ros::init(argc, argv, "manifold_uart_sender");
-    ros::NodeHandle nh;
-    
-    // Open serial port
-    int serial_port = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
-    if (serial_port < 0) {
-        ROS_ERROR("Error opening port: %s", strerror(errno));
-        return 1;
-    }
+namespace impulse_comms
 
-    // Configure port
-    struct termios tty;
-    memset(&tty, 0, sizeof(tty));
-    if (tcgetattr(serial_port, &tty) != 0) {
-        ROS_ERROR("Error from tcgetattr: %s", strerror(errno));
-        return 1;
-    }
+{
+class UARTPublisher {
+public:
+    UARTPublisher(const std::string& uart_device = "/dev/ttyUSB0")
+        : uart_device_(uart_device) {
 
-    // Set baud rate
-    cfsetospeed(&tty, B115200);
-    cfsetispeed(&tty, B115200);
+        // Initialize password buffer
+        str_password = std::to_string(PASSWORD) + "\n";
+        strcpy(BUFFER_PASSWORD, str_password.c_str());
 
-    // 8N1 (8 bits, no parity, 1 stop bit)
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
+        // Set up subscriber
+        drop_trigger_sub_ = nh_.subscribe("drop_trigger", 10,
+                                          &UARTPublisher::dropTriggerCallback, this);
 
-    // Set raw mode (disable echo, input processing)
-    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
-    tty.c_oflag &= ~OPOST;
-
-    // Save settings
-    if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
-        ROS_ERROR("Error from tcsetattr: %s", strerror(errno));
-        return 1;
-    }
-
-    // Flush the port
-    tcflush(serial_port, TCIOFLUSH);
-
-    // Write data
-    char msg[] = "18922601\n";
-
-    ssize_t bytes_written = write(serial_port, msg, strlen(msg));
-
-    // Array of 8-bit numbers to send
-    // uint8_t data[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
-
-    // // Send 8-bit numbers over UART
-    // ssize_t bytes_written = write(serial_port, data, sizeof(data));
-
-    if (bytes_written < 0) {
-        ROS_ERROR("Error writing to serial port: %s", strerror(errno));
-        close(serial_port);
-        return 1;
+        ROS_INFO("UART publisher initialized. Listening for trigger commands...");
     }
     
-    ROS_INFO("Sent message");
+    ~UARTPublisher() {
+        // Cleanup if needed
+    }
+
+    // Function to configure and open UART
+    int openUART() {
+        int serial_port = open(uart_device_.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+        if (serial_port < 0) {
+            ROS_ERROR("Error opening port: %s", strerror(errno));
+            return -1;
+        }
+
+        struct termios tty;
+        memset(&tty, 0, sizeof(tty));
+
+        if (tcgetattr(serial_port, &tty) != 0) {
+            ROS_ERROR("Error from tcgetattr: %s", strerror(errno));
+            close(serial_port);
+            return -1;
+        }
+
+        // Set baud rate
+        cfsetospeed(&tty, B115200);
+        cfsetispeed(&tty, B115200);
+
+        // 8N1 (8 bits, no parity, 1 stop bit)
+        tty.c_cflag &= ~PARENB;
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CSIZE;
+        tty.c_cflag |= CS8;
+
+        // Set raw mode (disable echo, input processing)
+        tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+        tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+        tty.c_oflag &= ~OPOST;
+
+        // Save settings
+        if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
+            ROS_ERROR("Error from tcsetattr: %s", strerror(errno));
+            close(serial_port);
+            return -1;
+        }
+
+        tcflush(serial_port, TCIOFLUSH);
+        return serial_port;
+    }
+
+private:
+    // Callback function for the subscriber
+    void dropTriggerCallback(const std_msgs::UInt32::ConstPtr& msg)
+    {
+        if (msg->data == PASSWORD) {
+            ROS_INFO("Correct password received, sending UART command...");
+
+            const auto serial_port = openUART();
+            if (serial_port < 0) {
+                ROS_ERROR("Failed to open UART");
+                return;
+            }
+
+            ssize_t bytes_written = write(serial_port, BUFFER_PASSWORD, strlen(BUFFER_PASSWORD));
+
+            if (bytes_written < 0) {
+                ROS_ERROR("Error writing to serial port: %s", strerror(errno));
+            } else {
+                ROS_INFO("Message sent over UART");
+            }
+
+            close(serial_port);
+        } else {
+            ROS_WARN("Incorrect password received: %u", msg->data);
+        }
+    }
+
+    ros::NodeHandle nh_;
+    ros::Subscriber drop_trigger_sub_;
     
-    close(serial_port);
+    const uint32_t PASSWORD = 18922601;
+    std::string str_password;
+    char BUFFER_PASSWORD[10];
+    
+    std::string uart_device_;
+};
+}
+
+int main(int argc, char** argv) {
+    ros::init(argc, argv, "manifold_uart_publisher");
+    // Create an instance of the class
+    impulse_comms::UARTPublisher uart_publisher;
+    ros::spin();
     return 0;
 }

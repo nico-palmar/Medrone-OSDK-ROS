@@ -10,7 +10,7 @@
 #include <geographic_msgs/GeoPoint.h>
 #include <geometry_msgs/Point.h>
 #include <dji_osdk_ros/common_type.h>
-
+#include <std_msgs/UInt32.h>
 
 namespace osdk = dji_osdk_ros;
 
@@ -33,6 +33,8 @@ public:
         // Subscribe to mobile data
         fromMobileDataSub_ = nh_.subscribe("dji_osdk_ros/from_mobile_data", 10, 
                                           &MobileCommandHandler::fromMobileDataSubCallback, this);
+
+        drop_trigger_pub_ = nh_.advertise<std_msgs::UInt32>("drop_trigger", 1000);
         
         command_handlers_ = {
             std::bind(&MobileCommandHandler::handleCommandA, this, std::placeholders::_1),
@@ -82,11 +84,13 @@ public:
 private:
     ros::NodeHandle nh_;
     ros::Subscriber fromMobileDataSub_;
+    ros::Publisher drop_trigger_pub_;
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
     
     // Constants
-    const uint32_t PASSWORD { 46000636 };
+    const uint32_t MSDK_PASSWORD { 46000636 };
+    const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
 
     void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData) {
@@ -144,13 +148,15 @@ private:
         std::memcpy(&trigger_drop_cmd, data.data(), sizeof(TriggerDropData));
         
         // Check the password fields for drop triggering
-        if (!(trigger_drop_cmd.password == PASSWORD && trigger_drop_cmd.drop_flag == DROP_FLAG)) {
+        if (!(trigger_drop_cmd.password == MSDK_PASSWORD && trigger_drop_cmd.drop_flag == DROP_FLAG)) {
             ROS_WARN_STREAM("Invalid drop combination provided, rejecting drop request. PWD " << trigger_drop_cmd.password << " and flag " << static_cast<int>(trigger_drop_cmd.drop_flag));
             return;
         }
-        ROS_INFO("Drop command received; triggering");
-        // TODO: Trigger a drop from here
-        // likely will send a signal to the UART node via topic, which then sends drop over uart
+        ROS_INFO("Drop command received; triggering over UART");
+
+        std_msgs::UInt32 uart_pwd;
+        uart_pwd.data = UART_PASSWORD;
+        drop_trigger_pub_.publish(uart_pwd);
     }
 
     void handleAbsoluteMission(const std::vector<uint8_t>& data) {
@@ -164,7 +170,7 @@ private:
         std::memcpy(&mission_data, data.data(), sizeof(AbsoluteMissionData));
         
         // Check password for mission validation
-        if (mission_data.password != PASSWORD)
+        if (mission_data.password != MSDK_PASSWORD)
         {
             ROS_WARN("Invalid password provided, rejecting absolute mission request");
             return;
@@ -195,7 +201,7 @@ private:
         std::memcpy(&mission_data, data.data(), sizeof(RelativeMissionData));
         
         // Check password for mission validation
-        if (mission_data.password != PASSWORD)
+        if (mission_data.password != MSDK_PASSWORD)
         {
             ROS_WARN("Invalid password provided, rejecting relative mission request");
             return;
