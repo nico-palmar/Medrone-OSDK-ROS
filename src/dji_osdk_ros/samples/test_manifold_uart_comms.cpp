@@ -79,7 +79,7 @@ private:
     void dropTriggerCallback(const std_msgs::UInt32::ConstPtr& msg)
     {
         if (msg->data == PASSWORD) {
-            ROS_INFO("Correct password received, sending UART command...");
+            ROS_ERROR("Correct password received, sending UART command...");
 
             const auto serial_port = openUART();
             if (serial_port < 0) {
@@ -92,12 +92,12 @@ private:
             if (bytes_written < 0) {
                 ROS_ERROR("Error writing to serial port: %s", strerror(errno));
             } else {
-                ROS_INFO("Message sent over UART");
+                ROS_ERROR("Message sent over UART");
             }
 
             close(serial_port);
         } else {
-            ROS_WARN("Incorrect password received: %u", msg->data);
+            ROS_ERROR("Incorrect password received: %u", msg->data);
         }
     }
 
