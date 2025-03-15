@@ -105,7 +105,7 @@ private:
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
-    const int OSDK_AUTHORITY_WAIT_TIME_S { 2 };
+    const int OSDK_AUTHORITY_WAIT_TIME_S { 4 };
     const double CHECK_CANCEL_MISSION_PERIOD_S { 1.0 };
     const double CHECK_AUTHORITY_TIMER_S { 1.0 };
 
@@ -146,7 +146,7 @@ private:
 
         if (result.wait_for(std::chrono::seconds(OSDK_AUTHORITY_WAIT_TIME_S)) != std::future_status::ready)
         {
-            ROS_ERROR_STREAM("Service call timed out after" << OSDK_AUTHORITY_WAIT_TIME_S << " seconds.");
+            ROS_ERROR_STREAM("Service call timed out after " << OSDK_AUTHORITY_WAIT_TIME_S << " seconds.");
             return false;
         }
         if (!result.get())
