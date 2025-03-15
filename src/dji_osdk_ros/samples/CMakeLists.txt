@@ -18,16 +18,9 @@ if(ENABLE_DARKNET_ROS)
 add_definitions(-DUSE_DARKNET_ROS)
 endif()
 
-add_executable(test_gpio
-        test_manifold_gpio.cpp)
-target_link_libraries(test_gpio
-        ${PROJECT_NAME}
-)
-add_dependencies(test_gpio dji_osdk_ros_generate_messages_cpp)
-
-add_executable(test_uart
-        test_manifold_uart_comms.cpp)
-target_link_libraries(test_uart
+add_executable(uart_comms_node
+        uart_comms.cpp)
+target_link_libraries(uart_comms_node
         ${PROJECT_NAME}
 )
 

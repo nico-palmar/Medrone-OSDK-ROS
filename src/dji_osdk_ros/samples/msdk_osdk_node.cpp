@@ -98,14 +98,15 @@ private:
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
 
-    void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData) {
+    void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData)
+    {
         ROS_INFO("Recived mobile data");
         if (fromMobileData->data.empty()) {
             ROS_INFO("Received empty data from mobile");
             return;
         }
 
-        // Handle command IDno instance of overloaded function "std::async" matches the argument list
+        // Handle command ID
         uint8_t command_id = static_cast<uint8_t>(fromMobileData->data[0]);
         ROS_INFO_STREAM("Received command ID: " << static_cast<int>(command_id));
 
@@ -115,45 +116,46 @@ private:
             return;
         }
 
-        if (!testOSDKActivation())
-        {
-            ROS_ERROR("Control authority is dead; ignoring message");
-            return;
-        }
-
         CommandHandler handler = command_handlers_[command_id];
         std::vector<uint8_t> payload(fromMobileData->data.begin() + 1, fromMobileData->data.end());
 
         handler(payload);
     }
 
-    bool callAuthorityService(osdk::ObtainControlAuthority &srv) {
+    bool callAuthorityService(osdk::ObtainControlAuthority &srv)
+    {
         return obtain_ctrl_authority_client_.call(srv);
     }
 
-    bool testOSDKActivation()
+    bool osdkHasAuthority()
     {
-        // Call service in a separate thread
         osdk::ObtainControlAuthority obtain_ctrl_authority;
         obtain_ctrl_authority.request.enable_obtain = true;
         std::future<bool> result = std::async(std::launch::async, &MobileCommandHandler::callAuthorityService, this, std::ref(obtain_ctrl_authority));
 
         // Wait up to 10 seconds for a response
-        if (result.wait_for(std::chrono::seconds(10)) == std::future_status::ready) {
-            if (result.get()) {
-                ROS_INFO("Service response: %d", obtain_ctrl_authority.response.result);
-                return true;
-            } else {
-                ROS_ERROR("Service call failed.");
-                return false;
-            }
-        } else {
+        if (result.wait_for(std::chrono::seconds(10)) != std::future_status::ready)
+        {
             ROS_ERROR("Service call timed out after 10 seconds.");
             return false;
         }
+        if (!result.get())
+        {
+            ROS_ERROR("Service call failed.");
+            return false;
+        }
+        if (!obtain_ctrl_authority.response.result)
+        {
+            ROS_ERROR("Service call has a result of false");
+            return false;
+        }
+
+        // otherwise, response is true, osdk has authority
+        return true;
     }
 
-    void handleCommandA(const std::vector<uint8_t>& data) {
+    void handleCommandA(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(CommandAData)) 
         {
             ROS_WARN("Invalid data size for Command A");
@@ -165,7 +167,8 @@ private:
                         << static_cast<double>(cmdA.test_val));
     }
 
-    void handleCommandB(const std::vector<uint8_t>& data) {
+    void handleCommandB(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(CommandBData)) {
             ROS_WARN("Invalid data size for Command B");
             return;
@@ -176,7 +179,8 @@ private:
                         << ", bool trigger=" << cmdB.trigger);
     }
 
-    void handleDropTrigger(const std::vector<uint8_t>& data) {
+    void handleDropTrigger(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(TriggerDropData)) {
             ROS_WARN_STREAM("Invalid data size for Drop Trigger Command");
             return;
@@ -196,10 +200,17 @@ private:
         drop_trigger_pub_.publish(uart_pwd);
     }
 
-    void handleAbsoluteMission(const std::vector<uint8_t>& data) {
+    void handleAbsoluteMission(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(AbsoluteMissionData))
         {
             ROS_WARN("Invalid data size for Absolute Mission Command");
+            return;
+        }
+
+        if (!osdkHasAuthority())
+        {
+            ROS_ERROR("Control authority is dead; ignoring message");
             return;
         }
         
@@ -227,10 +238,17 @@ private:
         runMissionServer(goal);
     }
 
-    void handleRelativeMission(const std::vector<uint8_t>& data) {
+    void handleRelativeMission(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(RelativeMissionData)) 
         {
             ROS_WARN("Invalid data size for Relative Mission Command");
+            return;
+        }
+
+        if (!osdkHasAuthority())
+        {
+            ROS_ERROR("Control authority is dead; ignoring message");
             return;
         }
         

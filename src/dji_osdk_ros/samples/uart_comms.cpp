@@ -9,9 +9,10 @@
 #include <cstring>
 
 namespace impulse_comms
-
 {
-class UARTPublisher {
+
+class UARTPublisher
+{
 public:
     UARTPublisher(const std::string& uart_device = "/dev/ttyUSB0")
         : uart_device_(uart_device) {
@@ -27,14 +28,14 @@ public:
         ROS_INFO("UART publisher initialized. Listening for trigger commands...");
     }
     
-    ~UARTPublisher() {
-        // Cleanup if needed
-    }
+    ~UARTPublisher() {}
 
-    // Function to configure and open UART
-    int openUART() {
+private:
+    int openUART()
+    {
         int serial_port = open(uart_device_.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
-        if (serial_port < 0) {
+        if (serial_port < 0) 
+        {
             ROS_ERROR("Error opening port: %s", strerror(errno));
             return -1;
         }
@@ -42,7 +43,8 @@ public:
         struct termios tty;
         memset(&tty, 0, sizeof(tty));
 
-        if (tcgetattr(serial_port, &tty) != 0) {
+        if (tcgetattr(serial_port, &tty) != 0)
+        {
             ROS_ERROR("Error from tcgetattr: %s", strerror(errno));
             close(serial_port);
             return -1;
@@ -64,7 +66,8 @@ public:
         tty.c_oflag &= ~OPOST;
 
         // Save settings
-        if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
+        if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
+        {
             ROS_ERROR("Error from tcsetattr: %s", strerror(errno));
             close(serial_port);
             return -1;
@@ -74,31 +77,29 @@ public:
         return serial_port;
     }
 
-private:
     // Callback function for the subscriber
     void dropTriggerCallback(const std_msgs::UInt32::ConstPtr& msg)
     {
-        if (msg->data == PASSWORD) {
-            ROS_ERROR("Correct password received, sending UART command...");
-
-            const auto serial_port = openUART();
-            if (serial_port < 0) {
-                ROS_ERROR("Failed to open UART");
-                return;
-            }
-
-            ssize_t bytes_written = write(serial_port, BUFFER_PASSWORD, strlen(BUFFER_PASSWORD));
-
-            if (bytes_written < 0) {
-                ROS_ERROR("Error writing to serial port: %s", strerror(errno));
-            } else {
-                ROS_ERROR("Message sent over UART");
-            }
-
-            close(serial_port);
-        } else {
+        if (msg->data != PASSWORD)
+        {
             ROS_ERROR("Incorrect password received: %u", msg->data);
+            return;
         }
+        
+        ROS_ERROR("Correct password received, sending UART command...");
+        const auto serial_port = openUART();
+        if (serial_port < 0) {
+            ROS_ERROR("Failed to open UART");
+            return;
+        }
+        ssize_t bytes_written = write(serial_port, BUFFER_PASSWORD, strlen(BUFFER_PASSWORD));
+        if (bytes_written < 0) {
+            ROS_ERROR("Error writing to serial port: %s", strerror(errno));
+        } else {
+            ROS_ERROR("Message sent over UART");
+        }
+
+        close(serial_port);
     }
 
     ros::NodeHandle nh_;
