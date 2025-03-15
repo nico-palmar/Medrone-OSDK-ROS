@@ -44,12 +44,12 @@ public:
     }
 
     // Define data structures for incoming requests
-    struct CommandAData
+    struct __attribute__((packed)) CommandAData
     {
         double test_val;
     };
 
-    struct CommandBData
+    struct __attribute__((packed)) CommandBData
     {
         uint8_t flag;
         bool trigger;

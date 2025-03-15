@@ -53,13 +53,6 @@ target_link_libraries(mission_planner_node
         )
 add_dependencies(mission_planner_node dji_osdk_ros_generate_messages_cpp)
 
-# add_executable(msdk_osdk_test_node
-#                test_msdk_osdk.cpp)
-# target_link_libraries(msdk_osdk_test_node
-#         ${PROJECT_NAME}
-#         )
-# add_dependencies(msdk_osdk_test_node dji_osdk_ros_generate_messages_cpp)
-
 add_executable(msdk_osdk_node
                msdk_osdk_node.cpp)
 target_link_libraries(msdk_osdk_node
