@@ -60,7 +60,7 @@ public:
             as_.setAborted(result_, err_msg);
             return;
         }
-        ROS_INFO("Mission is valid; proceeding");
+        ROS_ERROR("Mission is valid; proceeding");
 
         // obtain the control authority
         osdk::ObtainControlAuthority obtain_ctrl_authority;
@@ -78,7 +78,7 @@ public:
             return;
         }
 
-        ROS_INFO("Obtained control authority, proceeding");
+        ROS_ERROR("Obtained control authority, proceeding");
 
         // check the flight status
         const auto flight_status_msg = ros::topic::waitForMessage<std_msgs::UInt8>("dji_osdk_ros/flight_status", nh_, ros::Duration(TOPIC_TIMEOUT_S));
@@ -100,7 +100,7 @@ public:
         {
             osdk::FlightTaskControl control_task;
             control_task.request.task = osdk::FlightTaskControl::Request::TASK_TAKEOFF;
-            ROS_INFO("Takeoff request sending ...");
+            ROS_ERROR("Takeoff request sending ...");
             task_control_client_.call(control_task);
 
             if (control_task.response.result == false)
@@ -111,11 +111,11 @@ public:
                 as_.setAborted(result_, err_msg);
                 return;
             }
-            ROS_INFO("Takeoff successful, proceed to mission planner");
+            ROS_ERROR("Takeoff successful, proceed to mission planner");
         }
         else if (flight_msg == FLYING)
         {
-            ROS_INFO("Drone is already flying, proceed");
+            ROS_ERROR("Drone is already flying, proceed");
         }
         else
         {
@@ -128,9 +128,9 @@ public:
             return;
         }
 
-        ROS_INFO("Waiting for action server to start");
+        ROS_ERROR("Waiting for action server to start");
         ac_.waitForServer();
-        ROS_INFO("Action server started, sending waypoints.");
+        ROS_ERROR("Action server started, sending waypoints.");
 
         const auto waypoints = createWaypoints(goal);
 
@@ -144,7 +144,7 @@ public:
                 return;
             }
 
-            ROS_INFO("Reached waypoint %ld", i + 1);
+            ROS_ERROR("Reached waypoint %ld", i + 1);
             feedback_.n_waypoint = i+1;
             as_.publishFeedback(feedback_);
 
