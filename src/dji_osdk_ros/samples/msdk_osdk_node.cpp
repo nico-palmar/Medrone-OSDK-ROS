@@ -105,9 +105,9 @@ private:
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
-    const int OSDK_AUTHORITY_WAIT_TIME_S { 4 };
-    const double CHECK_CANCEL_MISSION_PERIOD_S { 1.0 };
-    const double CHECK_AUTHORITY_TIMER_S { 1.0 };
+    const int OSDK_AUTHORITY_WAIT_TIME_S { 10 };
+    const double CHECK_CANCEL_MISSION_PERIOD_S { 5.0 };
+    const double CHECK_AUTHORITY_TIMER_S { 5.0 };
 
     void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData)
     {
