@@ -10,7 +10,9 @@
 #include <geographic_msgs/GeoPoint.h>
 #include <geometry_msgs/Point.h>
 #include <dji_osdk_ros/common_type.h>
-
+#include <std_msgs/UInt32.h>
+#include <future>
+#include <dji_osdk_ros/ObtainControlAuthority.h>
 
 namespace osdk = dji_osdk_ros;
 
@@ -33,6 +35,10 @@ public:
         // Subscribe to mobile data
         fromMobileDataSub_ = nh_.subscribe("dji_osdk_ros/from_mobile_data", 10, 
                                           &MobileCommandHandler::fromMobileDataSubCallback, this);
+
+        drop_trigger_pub_ = nh_.advertise<std_msgs::UInt32>("drop_trigger", 1000);
+
+        obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
         
         command_handlers_ = {
             std::bind(&MobileCommandHandler::handleCommandA, this, std::placeholders::_1),
@@ -82,14 +88,18 @@ public:
 private:
     ros::NodeHandle nh_;
     ros::Subscriber fromMobileDataSub_;
+    ros::Publisher drop_trigger_pub_;
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
+    ros::ServiceClient obtain_ctrl_authority_client_;
     
     // Constants
-    const uint32_t PASSWORD { 46000636 };
+    const uint32_t MSDK_PASSWORD { 46000636 };
+    const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
 
-    void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData) {
+    void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData)
+    {
         ROS_INFO("Recived mobile data");
         if (fromMobileData->data.empty()) {
             ROS_INFO("Received empty data from mobile");
@@ -112,7 +122,40 @@ private:
         handler(payload);
     }
 
-    void handleCommandA(const std::vector<uint8_t>& data) {
+    bool callAuthorityService(osdk::ObtainControlAuthority &srv)
+    {
+        return obtain_ctrl_authority_client_.call(srv);
+    }
+
+    bool osdkHasAuthority()
+    {
+        osdk::ObtainControlAuthority obtain_ctrl_authority;
+        obtain_ctrl_authority.request.enable_obtain = true;
+        std::future<bool> result = std::async(std::launch::async, &MobileCommandHandler::callAuthorityService, this, std::ref(obtain_ctrl_authority));
+
+        // Wait up to 10 seconds for a response
+        if (result.wait_for(std::chrono::seconds(10)) != std::future_status::ready)
+        {
+            ROS_ERROR("Service call timed out after 10 seconds.");
+            return false;
+        }
+        if (!result.get())
+        {
+            ROS_ERROR("Service call failed.");
+            return false;
+        }
+        if (!obtain_ctrl_authority.response.result)
+        {
+            ROS_ERROR("Service call has a result of false");
+            return false;
+        }
+
+        // otherwise, response is true, osdk has authority
+        return true;
+    }
+
+    void handleCommandA(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(CommandAData)) 
         {
             ROS_WARN("Invalid data size for Command A");
@@ -124,7 +167,8 @@ private:
                         << static_cast<double>(cmdA.test_val));
     }
 
-    void handleCommandB(const std::vector<uint8_t>& data) {
+    void handleCommandB(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(CommandBData)) {
             ROS_WARN("Invalid data size for Command B");
             return;
@@ -135,7 +179,8 @@ private:
                         << ", bool trigger=" << cmdB.trigger);
     }
 
-    void handleDropTrigger(const std::vector<uint8_t>& data) {
+    void handleDropTrigger(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(TriggerDropData)) {
             ROS_WARN_STREAM("Invalid data size for Drop Trigger Command");
             return;
@@ -144,19 +189,28 @@ private:
         std::memcpy(&trigger_drop_cmd, data.data(), sizeof(TriggerDropData));
         
         // Check the password fields for drop triggering
-        if (!(trigger_drop_cmd.password == PASSWORD && trigger_drop_cmd.drop_flag == DROP_FLAG)) {
+        if (!(trigger_drop_cmd.password == MSDK_PASSWORD && trigger_drop_cmd.drop_flag == DROP_FLAG)) {
             ROS_WARN_STREAM("Invalid drop combination provided, rejecting drop request. PWD " << trigger_drop_cmd.password << " and flag " << static_cast<int>(trigger_drop_cmd.drop_flag));
             return;
         }
-        ROS_INFO("Drop command received; triggering");
-        // TODO: Trigger a drop from here
-        // likely will send a signal to the UART node via topic, which then sends drop over uart
+        ROS_INFO("Drop command received; triggering over UART");
+
+        std_msgs::UInt32 uart_pwd;
+        uart_pwd.data = UART_PASSWORD;
+        drop_trigger_pub_.publish(uart_pwd);
     }
 
-    void handleAbsoluteMission(const std::vector<uint8_t>& data) {
+    void handleAbsoluteMission(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(AbsoluteMissionData))
         {
             ROS_WARN("Invalid data size for Absolute Mission Command");
+            return;
+        }
+
+        if (!osdkHasAuthority())
+        {
+            ROS_ERROR("Control authority is dead; ignoring message");
             return;
         }
         
@@ -164,7 +218,7 @@ private:
         std::memcpy(&mission_data, data.data(), sizeof(AbsoluteMissionData));
         
         // Check password for mission validation
-        if (mission_data.password != PASSWORD)
+        if (mission_data.password != MSDK_PASSWORD)
         {
             ROS_WARN("Invalid password provided, rejecting absolute mission request");
             return;
@@ -184,10 +238,17 @@ private:
         runMissionServer(goal);
     }
 
-    void handleRelativeMission(const std::vector<uint8_t>& data) {
+    void handleRelativeMission(const std::vector<uint8_t>& data)
+    {
         if (data.size() < sizeof(RelativeMissionData)) 
         {
             ROS_WARN("Invalid data size for Relative Mission Command");
+            return;
+        }
+
+        if (!osdkHasAuthority())
+        {
+            ROS_ERROR("Control authority is dead; ignoring message");
             return;
         }
         
@@ -195,7 +256,7 @@ private:
         std::memcpy(&mission_data, data.data(), sizeof(RelativeMissionData));
         
         // Check password for mission validation
-        if (mission_data.password != PASSWORD)
+        if (mission_data.password != MSDK_PASSWORD)
         {
             ROS_WARN("Invalid password provided, rejecting relative mission request");
             return;
