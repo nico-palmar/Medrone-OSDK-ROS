@@ -319,6 +319,7 @@ private:
                 }
 
                 // check the authority
+                ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
                 const auto has_authority = osdkHasAuthority();
                 has_authority_.store(has_authority);
                 authority_check_in_progress_.store(false);
@@ -331,7 +332,7 @@ private:
             [this](const ros::TimerEvent&) {
                 if (has_authority_.load() == false)
                 {
-                    ROS_INFO("Cancel condition met, cancelling mission");
+                    ROS_ERROR("Cancel condition met, cancelling mission");
                     ac_.cancelGoal();
                     authority_check_timer_.stop();
                     cancel_mission_timer_.stop();
