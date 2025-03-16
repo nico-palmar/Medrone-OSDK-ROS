@@ -15,6 +15,7 @@
 #include <Eigen/Dense>
 #include <dji_osdk_ros/MoveToWaypointAction.h>
 #include <std_msgs/UInt8.h>
+#include <functional>
 
 namespace osdk = dji_osdk_ros;
 
@@ -252,7 +253,7 @@ private:
         return true;
     }
 
-    void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MissionResultConstPtr& result)
+    void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MoveToWaypointResultConstPtr& result)
     {
         // Check if the mission has been preempted
         if (as_.isPreemptRequested() || !ros::ok())
@@ -284,7 +285,7 @@ private:
         // fill for starting to navigate to a new waypoint
     }
 
-    void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)
+    void feedbackCallback()
     {
         // this is the key; check for preemptions of this action server as it runs it's action client
         if (as_.isPreemptRequested() || !ros::ok())
@@ -327,7 +328,7 @@ private:
 
         ac_.sendGoal(goal, std::bind(&MissionPlannerActionServer::waypointReachedCallback, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&MissionPlannerActionServer::activeCallback, this),
-            std::bind(&MissionPlannerActionServer::feedbackCallback, this, std::placeholders::_1));
+            std::bind(&MissionPlannerActionServer::feedbackCallback, this));
     }
 
     ros::NodeHandle nh_;
