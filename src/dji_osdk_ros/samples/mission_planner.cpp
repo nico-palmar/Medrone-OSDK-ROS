@@ -260,7 +260,7 @@ private:
         // Check if the mission has been preempted
         if (as_.isPreemptRequested() || !ros::ok())
         {
-            ROS_INFO("Mission preempted during waypoint navigation");
+            ROS_ERROR("Mission preempted during waypoint navigation");
             as_.setPreempted();
             ac_.cancelAllGoals();
             return;
@@ -274,7 +274,7 @@ private:
             as_.setAborted(result_, "Navigation failed");
         }
 
-        ROS_INFO("Reached waypoint %ld", waypoint_idx_ + 1);
+        ROS_ERROR("Reached waypoint %ld", waypoint_idx_ + 1);
         // Move to next waypoint
         waypoint_idx_++;
         feedback_.n_waypoint = waypoint_idx_ + 1;
@@ -292,7 +292,7 @@ private:
         // this is the key; check for preemptions of this action server as it runs it's action client
         if (as_.isPreemptRequested() || !ros::ok())
         {
-            ROS_INFO("Mission preempted");
+            ROS_ERROR("Mission preempted");
             as_.setPreempted();
             ac_.cancelAllGoals();
             return;
