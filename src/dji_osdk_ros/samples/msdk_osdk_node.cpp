@@ -331,6 +331,8 @@ private:
                     // cancel_mission_timer_.stop();
                     authority_check_in_progress_.store(false);
                     has_authority_.store(true);
+                    // wait for the goal cancelling to go through
+                    ros::Duration(0.5).sleep();
                 }
 
                 authority_check_in_progress_.store(false);
