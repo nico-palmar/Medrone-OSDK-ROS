@@ -300,20 +300,20 @@ private:
         // fill for starting to navigate to a new waypoint
     }
 
-    void feedbackCallback()
-    {
-        // this is the key; check for preemptions of this action server as it runs it's action client
-        if (as_.isPreemptRequested() || !ros::ok())
-        {
-            ROS_ERROR("Mission preempted");
-            as_.setPreempted();
-            ac_.cancelAllGoals();
-            return;
-        }
-        // might be redundant below and too much span; consider removing
-        feedback_.n_waypoint = waypoint_idx_+1;
-        as_.publishFeedback(feedback_);
-    }
+    // void feedbackCallback()
+    // {
+    //     // this is the key; check for preemptions of this action server as it runs it's action client
+    //     if (as_.isPreemptRequested() || !ros::ok())
+    //     {
+    //         ROS_ERROR("Mission preempted");
+    //         as_.setPreempted();
+    //         ac_.cancelAllGoals();
+    //         return;
+    //     }
+    //     // might be redundant below and too much span; consider removing
+    //     feedback_.n_waypoint = waypoint_idx_+1;
+    //     as_.publishFeedback(feedback_);
+    // }
 
     void navigateToNextWaypoint()
     {
@@ -342,8 +342,8 @@ private:
         goal.rel_goal_position.z = waypoint.z;
 
         ac_.sendGoal(goal, std::bind(&MissionPlannerActionServer::waypointReachedCallback, this, std::placeholders::_1, std::placeholders::_2),
-            std::bind(&MissionPlannerActionServer::activeCallback, this),
-            std::bind(&MissionPlannerActionServer::feedbackCallback, this));
+            std::bind(&MissionPlannerActionServer::activeCallback, this));
+            // std::bind(&MissionPlannerActionServer::feedbackCallback, this));
     }
 
     ros::NodeHandle nh_;
