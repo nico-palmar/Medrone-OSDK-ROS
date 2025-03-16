@@ -134,6 +134,8 @@ public:
         ROS_ERROR("Action server started, sending waypoints.");
 
         waypoints_ = createWaypoints(goal);
+        // reset the waypoint index
+        waypoint_idx_ = 0;
         navigateToNextWaypoint();
     }
 
@@ -267,15 +269,15 @@ private:
         if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
         {
             ROS_ERROR("Failed to reach waypoint %ld with state: %s",
-                waypoint_idx + 1, state.toString().c_str());
+                waypoint_idx_ + 1, state.toString().c_str());
             result_.success = false;
             as_.setAborted(result_, "Navigation failed");
         }
 
-        ROS_INFO("Reached waypoint %ld", waypoint_idx + 1);
+        ROS_INFO("Reached waypoint %ld", waypoint_idx_ + 1);
         // Move to next waypoint
-        waypoint_idx++;
-        feedback_.n_waypoint = waypoint_idx + 1;
+        waypoint_idx_++;
+        feedback_.n_waypoint = waypoint_idx_ + 1;
         as_.publishFeedback(feedback_);
         navigateToNextWaypoint();
     }
@@ -296,7 +298,7 @@ private:
             return;
         }
         // might be redundant below and too much span; consider removing
-        feedback_.n_waypoint = waypoint_idx+1;
+        feedback_.n_waypoint = waypoint_idx_+1;
         as_.publishFeedback(feedback_);
     }
 
@@ -305,21 +307,21 @@ private:
         // Check if we should continue
         if (as_.isPreemptRequested() || !ros::ok())
         {
-            ROS_INFO("Mission preempted");
+            ROS_ERROR("Mission preempted");
             as_.setPreempted();
             ac_.cancelAllGoals();
             return;
         }
-        if (waypoint_idx >= waypoints_.size())
+        if (waypoint_idx_ >= waypoints_.size())
         {
             // TODO: consider adding in landing later
-            ROS_INFO("Mission completed successfully");
+            ROS_ERROR("Mission completed successfully");
             result_.success = true;
             as_.setSucceeded(result_);
             return;
         }
 
-        const auto waypoint = waypoints_[waypoint_idx];
+        const auto waypoint = waypoints_[waypoint_idx_];
         osdk::MoveToWaypointGoal goal;
         goal.relative = true;
         goal.rel_goal_position.x = waypoint.x;
@@ -348,7 +350,7 @@ private:
 
     Eigen::Vector3d goal_ned_error_;
 
-    size_t waypoint_idx;
+    size_t waypoint_idx_ { 0 };
     std::vector<geometry_msgs::Point> waypoints_;
 
     // primitive mission planner information
