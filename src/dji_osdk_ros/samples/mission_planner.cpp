@@ -278,6 +278,12 @@ private:
         //     return;
         // }
 
+        if (state == actionlib::SimpleClientGoalState::PREEMPTED)
+        {
+            // preempt has handled cancellations, return
+            return;
+        }
+
         if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
         {
             ROS_ERROR("NICO CRY MORE");
@@ -285,6 +291,7 @@ private:
                 waypoint_idx_ + 1, state.toString().c_str());
             result_.success = false;
             as_.setAborted(result_, "Navigation failed");
+            return;
         }
 
         ROS_ERROR("Reached waypoint %ld", waypoint_idx_ + 1);

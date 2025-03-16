@@ -330,6 +330,7 @@ private:
         // Start a timer to periodically check if we should cancel the mission
         cancel_mission_timer_ = nh_.createTimer(ros::Duration(CHECK_CANCEL_MISSION_PERIOD_S),
             [this](const ros::TimerEvent&) {
+                ROS_ERROR("CANCEL MISSION CHECKING");
                 if (has_authority_.load() == false)
                 {
                     ROS_ERROR("Cancel condition met, cancelling mission");
