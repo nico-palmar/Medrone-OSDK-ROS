@@ -35,7 +35,7 @@ class MissionPlannerActionServer
 {
 public:
     MissionPlannerActionServer(std::string name) :
-        as_(nh_, name, boost::bind(&MissionPlannerActionServer::executeMission, this, _1), false),
+        as_(nh_, name, false),
         action_name_(name),
         ac_("waypoint_control", true)
     {
@@ -44,13 +44,18 @@ public:
         enable_upward_avoid_client_ = nh_.serviceClient<osdk::SetAvoidEnable>("/set_upwards_avoid_enable");
         get_avoid_enable_client_ = nh_.serviceClient<osdk::GetAvoidEnable>("get_avoid_enable_status");
         obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
+
+        as_.registerGoalCallback(std::bind(&MissionPlannerActionServer::goalCallback, this));
+        as_.registerPreemptCallback(std::bind(&MissionPlannerActionServer::preemptCallback, this));
         as_.start();
         ROS_INFO("Mission Planner Action Server started");
     }
 
+private:
     // Execute mission (takeoff -> waypoints -> landing)
-    void executeMission(const osdk::MissionGoalConstPtr& goal)
+    void goalCallback()
     {
+        const auto goal = as_.acceptNewGoal();
         // validate the mission
         if (!validMission(goal))
         {
@@ -139,7 +144,13 @@ public:
         navigateToNextWaypoint();
     }
 
-private:
+    void preemptCallback()
+    {
+        ROS_ERROR("Mission preempted");
+        as_.setPreempted();
+        ac_.cancelAllGoals();
+        return;
+    }
 
     std::vector<geometry_msgs::Point> createWaypoints(const osdk::MissionGoalConstPtr& goal)
     {
