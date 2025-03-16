@@ -257,6 +257,7 @@ private:
 
     void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MoveToWaypointResultConstPtr& result)
     {
+        ROS_ERROR("IN WAYPOINY REACHED CB");
         // Check if the mission has been preempted
         if (as_.isPreemptRequested() || !ros::ok())
         {
@@ -268,6 +269,7 @@ private:
 
         if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
         {
+            ROS_ERROR("NICO CRY MORE");
             ROS_ERROR("Failed to reach waypoint %ld with state: %s",
                 waypoint_idx_ + 1, state.toString().c_str());
             result_.success = false;
