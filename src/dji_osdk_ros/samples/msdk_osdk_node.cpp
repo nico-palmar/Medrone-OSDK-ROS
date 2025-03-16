@@ -97,7 +97,7 @@ private:
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
     ros::ServiceClient obtain_ctrl_authority_client_;
-    ros::Timer cancel_mission_timer_;
+    // ros::Timer cancel_mission_timer_;
     ros::Timer authority_check_timer_;
     std::atomic<bool> authority_check_in_progress_;
     std::atomic<bool> has_authority_;
@@ -289,7 +289,7 @@ private:
     void missionCompleteCallback(const actionlib::SimpleClientGoalState& state, const osdk::MissionResultConstPtr& result)
     {
         authority_check_timer_.stop();
-        cancel_mission_timer_.stop();
+        // cancel_mission_timer_.stop();
 
         // reset the variables for next time
         authority_check_in_progress_.store(false);
@@ -322,26 +322,37 @@ private:
                 // ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
                 const auto has_authority = osdkHasAuthority();
                 has_authority_.store(has_authority);
+
+                if (!has_authority)
+                {
+                    ROS_ERROR("Cancel condition met, cancelling mission");
+                    ac_.cancelGoal();
+                    authority_check_timer_.stop();
+                    // cancel_mission_timer_.stop();
+                    authority_check_in_progress_.store(false);
+                    has_authority_.store(true);
+                }
+
                 authority_check_in_progress_.store(false);
             }
         );
 
 
         // Start a timer to periodically check if we should cancel the mission
-        cancel_mission_timer_ = nh_.createTimer(ros::Duration(CHECK_CANCEL_MISSION_PERIOD_S),
-            [this](const ros::TimerEvent&) {
-                // ROS_ERROR("CANCEL MISSION CHECKING");
-                if (has_authority_.load() == false)
-                {
-                    ROS_ERROR("Cancel condition met, cancelling mission");
-                    ac_.cancelGoal();
-                    authority_check_timer_.stop();
-                    cancel_mission_timer_.stop();
-                    authority_check_in_progress_.store(false);
-                    has_authority_.store(true);
-                }
-            }
-        );
+        // cancel_mission_timer_ = nh_.createTimer(ros::Duration(CHECK_CANCEL_MISSION_PERIOD_S),
+        //     [this](const ros::TimerEvent&) {
+        //         // ROS_ERROR("CANCEL MISSION CHECKING");
+        //         if (has_authority_.load() == false)
+        //         {
+        //             ROS_ERROR("Cancel condition met, cancelling mission");
+        //             ac_.cancelGoal();
+        //             authority_check_timer_.stop();
+        //             cancel_mission_timer_.stop();
+        //             authority_check_in_progress_.store(false);
+        //             has_authority_.store(true);
+        //         }
+        //     }
+        // );
     }
 
     void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)
