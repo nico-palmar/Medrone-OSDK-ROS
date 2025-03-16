@@ -105,9 +105,9 @@ private:
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
-    const int OSDK_AUTHORITY_WAIT_TIME_S { 10 };
-    const double CHECK_CANCEL_MISSION_PERIOD_S { 0.1 };
-    const double CHECK_AUTHORITY_TIMER_S { 0.1 };
+    const int OSDK_AUTHORITY_WAIT_TIME_S { 8 };
+    const double CHECK_CANCEL_MISSION_PERIOD_S { 1 };
+    const double CHECK_AUTHORITY_TIMER_S { 1 };
 
     void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData)
     {
@@ -314,11 +314,13 @@ private:
                 if (authority_check_in_progress_.exchange(true))
                 {
                     // authority check is already occuring; skip this one
+                    ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
                     return;
                 }
 
                 // check the authority
-                has_authority_.store(osdkHasAuthority());
+                const auto has_authority = osdkHasAuthority();
+                has_authority_.store(has_authority);
                 authority_check_in_progress_.store(false);
             }
         );

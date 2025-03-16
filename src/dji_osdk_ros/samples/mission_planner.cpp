@@ -132,38 +132,8 @@ public:
         ac_.waitForServer();
         ROS_ERROR("Action server started, sending waypoints.");
 
-        const auto waypoints = createWaypoints(goal);
-
-        for (size_t i = 0; i < waypoints.size(); i++)
-        {
-            const auto waypoint = waypoints[i];
-            if (!navigateToWaypoint(waypoint)) {
-                ROS_ERROR("Failed to reach waypoint %ld", i + 1);
-                result_.success = false;
-                as_.setAborted(result_, "Navigation failed");
-                return;
-            }
-
-            ROS_ERROR("Reached waypoint %ld", i + 1);
-            feedback_.n_waypoint = i+1;
-            as_.publishFeedback(feedback_);
-
-            // Check if the action has been preempted
-            if (as_.isPreemptRequested() || !ros::ok()) {
-                ROS_INFO("Mission preempted");
-                // consider returning to home here
-                as_.setPreempted();
-                ac_.cancelAllGoals();
-                return;
-            }
-        }
-
-        // TODO: add in landing later
-
-        // Success!
-        ROS_INFO("Mission completed successfully");
-        result_.success = true;
-        as_.setSucceeded(result_);
+        waypoints_ = createWaypoints(goal);
+        navigateToNextWaypoint();
     }
 
 private:
@@ -282,25 +252,82 @@ private:
         return true;
     }
 
-    bool navigateToWaypoint(const geometry_msgs::Point& waypoint)
+    void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MissionResultConstPtr& result)
     {
+        // Check if the mission has been preempted
+        if (as_.isPreemptRequested() || !ros::ok())
+        {
+            ROS_INFO("Mission preempted during waypoint navigation");
+            as_.setPreempted();
+            ac_.cancelAllGoals();
+            return;
+        }
+
+        if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
+        {
+            ROS_ERROR("Failed to reach waypoint %ld with state: %s",
+                waypoint_idx + 1, state.toString().c_str());
+            result_.success = false;
+            as_.setAborted(result_, "Navigation failed");
+        }
+
+        ROS_INFO("Reached waypoint %ld", waypoint_idx + 1);
+        // Move to next waypoint
+        waypoint_idx++;
+        feedback_.n_waypoint = waypoint_idx + 1;
+        as_.publishFeedback(feedback_);
+        navigateToNextWaypoint();
+    }
+
+    void activeCallback()
+    {
+        // fill for starting to navigate to a new waypoint
+    }
+
+    void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)
+    {
+        // this is the key; check for preemptions of this action server as it runs it's action client
+        if (as_.isPreemptRequested() || !ros::ok())
+        {
+            ROS_INFO("Mission preempted");
+            as_.setPreempted();
+            ac_.cancelAllGoals();
+            return;
+        }
+        // might be redundant below and too much span; consider removing
+        feedback_.n_waypoint = waypoint_idx+1;
+        as_.publishFeedback(feedback_);
+    }
+
+    void navigateToNextWaypoint()
+    {
+        // Check if we should continue
+        if (as_.isPreemptRequested() || !ros::ok())
+        {
+            ROS_INFO("Mission preempted");
+            as_.setPreempted();
+            ac_.cancelAllGoals();
+            return;
+        }
+        if (waypoint_idx >= waypoints_.size())
+        {
+            // TODO: consider adding in landing later
+            ROS_INFO("Mission completed successfully");
+            result_.success = true;
+            as_.setSucceeded(result_);
+            return;
+        }
+
+        const auto waypoint = waypoints_[waypoint_idx];
         osdk::MoveToWaypointGoal goal;
         goal.relative = true;
         goal.rel_goal_position.x = waypoint.x;
         goal.rel_goal_position.y = waypoint.y;
         goal.rel_goal_position.z = waypoint.z;
 
-        ac_.sendGoal(goal);
-        const auto finished_before_timeout = ac_.waitForResult(ros::Duration(SINLGE_WAYPOINT_TIMEOUT_S));
-
-        if (!finished_before_timeout)
-        {
-            ROS_ERROR("Timed out waiting for action server to reach waypoint");
-            return false;
-        }
-
-        const auto waypoint_result = ac_.getResult();
-        return waypoint_result->success;
+        ac_.sendGoal(goal, std::bind(&MissionPlannerActionServer::waypointReachedCallback, this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&MissionPlannerActionServer::activeCallback, this),
+            std::bind(&MissionPlannerActionServer::feedbackCallback, this, std::placeholders::_1));
     }
 
     ros::NodeHandle nh_;
@@ -319,6 +346,9 @@ private:
     ros::ServiceClient obtain_ctrl_authority_client_;
 
     Eigen::Vector3d goal_ned_error_;
+
+    size_t waypoint_idx;
+    std::vector<geometry_msgs::Point> waypoints_;
 
     // primitive mission planner information
     const int N_WAYPOINTS { 3 };
