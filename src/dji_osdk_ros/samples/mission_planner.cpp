@@ -270,13 +270,13 @@ private:
     {
         ROS_ERROR("IN WAYPOINY REACHED CB");
         // Check if the mission has been preempted
-        if (as_.isPreemptRequested() || !ros::ok())
-        {
-            ROS_ERROR("Mission preempted during waypoint navigation");
-            as_.setPreempted();
-            ac_.cancelAllGoals();
-            return;
-        }
+        // if (as_.isPreemptRequested() || !ros::ok())
+        // {
+        //     ROS_ERROR("Mission preempted during waypoint navigation");
+        //     as_.setPreempted();
+        //     ac_.cancelAllGoals();
+        //     return;
+        // }
 
         if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
         {
@@ -318,13 +318,13 @@ private:
     void navigateToNextWaypoint()
     {
         // Check if we should continue
-        if (as_.isPreemptRequested() || !ros::ok())
-        {
-            ROS_ERROR("Mission preempted");
-            as_.setPreempted();
-            ac_.cancelAllGoals();
-            return;
-        }
+        // if (as_.isPreemptRequested() || !ros::ok())
+        // {
+        //     ROS_ERROR("Mission preempted");
+        //     as_.setPreempted();
+        //     ac_.cancelAllGoals();
+        //     return;
+        // }
         if (waypoint_idx_ >= waypoints_.size())
         {
             // TODO: consider adding in landing later
