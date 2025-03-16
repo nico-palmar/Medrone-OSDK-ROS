@@ -268,7 +268,7 @@ private:
 
     void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MoveToWaypointResultConstPtr& result)
     {
-        ROS_ERROR("IN WAYPOINY REACHED CB");
+        // ROS_ERROR("IN WAYPOINY REACHED CB");
         // Check if the mission has been preempted
         // if (as_.isPreemptRequested() || !ros::ok())
         // {

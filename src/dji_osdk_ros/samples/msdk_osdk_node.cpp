@@ -105,7 +105,7 @@ private:
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
-    const int OSDK_AUTHORITY_WAIT_TIME_S { 8 };
+    const int OSDK_AUTHORITY_WAIT_TIME_S { 10 };
     const double CHECK_CANCEL_MISSION_PERIOD_S { 1 };
     const double CHECK_AUTHORITY_TIMER_S { 1 };
 
@@ -319,7 +319,7 @@ private:
                 }
 
                 // check the authority
-                ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
+                // ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
                 const auto has_authority = osdkHasAuthority();
                 has_authority_.store(has_authority);
                 authority_check_in_progress_.store(false);
@@ -330,7 +330,7 @@ private:
         // Start a timer to periodically check if we should cancel the mission
         cancel_mission_timer_ = nh_.createTimer(ros::Duration(CHECK_CANCEL_MISSION_PERIOD_S),
             [this](const ros::TimerEvent&) {
-                ROS_ERROR("CANCEL MISSION CHECKING");
+                // ROS_ERROR("CANCEL MISSION CHECKING");
                 if (has_authority_.load() == false)
                 {
                     ROS_ERROR("Cancel condition met, cancelling mission");
