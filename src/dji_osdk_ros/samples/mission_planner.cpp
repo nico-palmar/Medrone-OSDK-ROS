@@ -280,11 +280,13 @@ private:
 
         if (state == actionlib::SimpleClientGoalState::PREEMPTED)
         {
-            // Explicitly set the parent action as preempted
             ROS_ERROR("Waypoint navigation was preempted");
-            result_.success = false;
-            result_.message = "Mission was preempted during waypoint navigation";
-            as_.setPreempted(result_, "Mission was preempted");
+            if (as_.isActive())
+            {
+                result_.success = false;
+                result_.message = "Mission was preempted during waypoint navigation";
+                as_.setPreempted(result_, "Mission was preempted");
+            }
             return;
         }
 
