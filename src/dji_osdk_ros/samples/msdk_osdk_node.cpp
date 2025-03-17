@@ -353,6 +353,7 @@ private:
                 state.toString().c_str(), result->message.c_str());
             return;
         }
+        mission_active_.store(false);
         ROS_INFO("Mission completed successfully: %s", result->message.c_str());
     }
 
