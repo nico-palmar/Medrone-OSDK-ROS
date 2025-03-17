@@ -130,8 +130,8 @@ private:
     {
         // check that the altitude is within some bounds of the goal
         // and that the current speed is low enough
-        const auto position_bound { 1e-1 };
-        const auto speed_bound { 1e-1 };
+        const auto position_bound { 5e-1 };
+        const auto speed_bound { 5e-1 };
         const auto within_position_bound = ned_error.norm() <= position_bound;
         const auto within_speed_bound = measured_speed_.norm() <= speed_bound;
         return within_position_bound && within_speed_bound;
