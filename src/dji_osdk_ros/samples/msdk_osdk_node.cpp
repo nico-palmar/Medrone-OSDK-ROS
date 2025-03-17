@@ -27,7 +27,8 @@ public:
     MobileCommandHandler(std::string name) :
         nh_(),
         ac_("mission_planner", true),
-        authority_check_thread_running_(false)
+        authority_check_thread_running_(false),
+        mission_active_(false)
     {
         // Initialize the action client
         ROS_INFO("Waiting for action server to start...");
