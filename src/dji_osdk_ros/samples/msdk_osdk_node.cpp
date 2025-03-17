@@ -421,8 +421,9 @@ private:
             // Cancel the current mission
             ROS_WARN("Preempting current mission with new request");
             ac_.cancelGoal();
+            mission_active_.store(false);
             // Small delay to ensure cancellation is processed
-            ros::Duration(0.1).sleep();
+            ros::Duration(0.5).sleep();
         }
 
         ROS_INFO("Sending mission goal to action server");
