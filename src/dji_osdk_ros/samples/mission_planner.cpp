@@ -382,7 +382,7 @@ private:
     // primitive mission planner information
     const int N_WAYPOINTS { 3 };
     // the flight altitude of the drone
-    const double FLYING_ALTITUDE_M { 40.0 };
+    const double FLYING_ALTITUDE_M { 20.0 };
     const double SINLGE_WAYPOINT_TIMEOUT_S { 60.0 };
     const double TOPIC_TIMEOUT_S { 5.0 };
 };
