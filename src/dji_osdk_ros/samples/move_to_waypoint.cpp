@@ -228,7 +228,7 @@ private:
 
     // velocity saturation [m/s]
     // max magnitude of the velocity vector
-    const float speed_saturation_ { 15.0 };
+    const float speed_saturation_ { 1000.0 };
 
     Eigen::Vector3d measured_speed_;
 
