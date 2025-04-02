@@ -111,8 +111,6 @@ private:
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
     ros::ServiceClient obtain_ctrl_authority_client_;
-    // ros::Timer cancel_mission_timer_;
-    // ros::Timer authority_check_timer_;
     std::atomic<bool> authority_check_in_progress_;
     std::atomic<bool> has_authority_;
     std::thread authority_check_thread_;
@@ -136,7 +134,6 @@ private:
             {
                 auto should_cancel = false;
                 {
-                    // Minimize the critical section
                     std::lock_guard<std::mutex> lock(authority_mutex_);
                     if (!authority_check_in_progress_.exchange(true))
                     {
@@ -339,13 +336,15 @@ private:
 
     void missionCompleteCallback(const actionlib::SimpleClientGoalState& state, const osdk::MissionResultConstPtr& result)
     {
-        // authority_check_timer_.stop();
-        // cancel_mission_timer_.stop();
-
         // reset the variables for next time
-        authority_check_in_progress_.store(false);
-        // assume we have authority on reset to not cancel a mission by accident
-        has_authority_.store(true);
+        {
+            // TODO: be careful, this mutex has not been tested to be working
+            // if things break, remove this mutex
+            std::lock_guard<std::mutex> lock(authority_mutex_);
+            authority_check_in_progress_.store(false);
+            // assume we have authority on reset to not cancel a mission by accident
+            has_authority_.store(true);
+        }
 
         if (state != actionlib::SimpleClientGoalState::SUCCEEDED)
         {
@@ -361,52 +360,6 @@ private:
     {
         ROS_INFO("Goal just went active");
         mission_active_.store(true);
-        // Start a timer to periodically update the cancel mission status
-        // authority_check_timer_ = nh_.createTimer(ros::Duration(CHECK_AUTHORITY_TIMER_S),
-        //     [this](const ros::TimerEvent&) {
-        //         if (authority_check_in_progress_.exchange(true))
-        //         {
-        //             // authority check is already occuring; skip this one
-        //             ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
-        //             return;
-        //         }
-
-        //         // check the authority
-        //         // ROS_ERROR("SKIPPING OSDK AUTHROITY CHECK");
-        //         const auto has_authority = osdkHasAuthority();
-        //         has_authority_.store(has_authority);
-
-        //         if (!has_authority)
-        //         {
-        //             ROS_ERROR("Cancel condition met, cancelling mission");
-        //             ac_.cancelGoal();
-        //             ros::Duration(0.5).sleep();
-        //             authority_check_timer_.stop();
-        //             // cancel_mission_timer_.stop();
-        //             authority_check_in_progress_.store(false);
-        //             has_authority_.store(true);
-        //             // wait for the goal cancelling to go through
-        //         }
-
-        //         authority_check_in_progress_.store(false);
-        //     }
-        // );
-
-        // Start a timer to periodically check if we should cancel the mission
-        // cancel_mission_timer_ = nh_.createTimer(ros::Duration(CHECK_CANCEL_MISSION_PERIOD_S),
-        //     [this](const ros::TimerEvent&) {
-        //         // ROS_ERROR("CANCEL MISSION CHECKING");
-        //         if (has_authority_.load() == false)
-        //         {
-        //             ROS_ERROR("Cancel condition met, cancelling mission");
-        //             ac_.cancelGoal();
-        //             authority_check_timer_.stop();
-        //             cancel_mission_timer_.stop();
-        //             authority_check_in_progress_.store(false);
-        //             has_authority_.store(true);
-        //         }
-        //     }
-        // );
     }
 
     void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)

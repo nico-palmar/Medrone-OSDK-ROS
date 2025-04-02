@@ -268,16 +268,6 @@ private:
 
     void waypointReachedCallback(const actionlib::SimpleClientGoalState& state, const osdk::MoveToWaypointResultConstPtr& result)
     {
-        // ROS_ERROR("IN WAYPOINY REACHED CB");
-        // Check if the mission has been preempted
-        // if (as_.isPreemptRequested() || !ros::ok())
-        // {
-        //     ROS_ERROR("Mission preempted during waypoint navigation");
-        //     as_.setPreempted();
-        //     ac_.cancelAllGoals();
-        //     return;
-        // }
-
         if (state == actionlib::SimpleClientGoalState::PREEMPTED)
         {
             ROS_ERROR("Waypoint navigation was preempted");
@@ -292,7 +282,6 @@ private:
 
         if (!(state == actionlib::SimpleClientGoalState::SUCCEEDED && result->success))
         {
-            ROS_ERROR("NICO CRY MORE");
             ROS_ERROR("Failed to reach waypoint %ld with state: %s",
                 waypoint_idx_ + 1, state.toString().c_str());
             result_.success = false;
@@ -313,31 +302,8 @@ private:
         // fill for starting to navigate to a new waypoint
     }
 
-    // void feedbackCallback()
-    // {
-    //     // this is the key; check for preemptions of this action server as it runs it's action client
-    //     if (as_.isPreemptRequested() || !ros::ok())
-    //     {
-    //         ROS_ERROR("Mission preempted");
-    //         as_.setPreempted();
-    //         ac_.cancelAllGoals();
-    //         return;
-    //     }
-    //     // might be redundant below and too much span; consider removing
-    //     feedback_.n_waypoint = waypoint_idx_+1;
-    //     as_.publishFeedback(feedback_);
-    // }
-
     void navigateToNextWaypoint()
     {
-        // Check if we should continue
-        // if (as_.isPreemptRequested() || !ros::ok())
-        // {
-        //     ROS_ERROR("Mission preempted");
-        //     as_.setPreempted();
-        //     ac_.cancelAllGoals();
-        //     return;
-        // }
         if (waypoint_idx_ >= waypoints_.size())
         {
             // TODO: consider adding in landing later
@@ -356,7 +322,6 @@ private:
 
         ac_.sendGoal(goal, std::bind(&MissionPlannerActionServer::waypointReachedCallback, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&MissionPlannerActionServer::activeCallback, this));
-            // std::bind(&MissionPlannerActionServer::feedbackCallback, this));
     }
 
     ros::NodeHandle nh_;
