@@ -130,8 +130,8 @@ private:
     {
         // check that the altitude is within some bounds of the goal
         // and that the current speed is low enough
-        const auto position_bound { 1e-1 };
-        const auto speed_bound { 1e-2 };
+        const auto position_bound { 5e-1 };
+        const auto speed_bound { 5e-1 };
         const auto within_position_bound = ned_error.norm() <= position_bound;
         const auto within_speed_bound = measured_speed_.norm() <= speed_bound;
         return within_position_bound && within_speed_bound;
@@ -224,11 +224,11 @@ private:
     osdk::MoveToWaypointFeedback feedback_;
 
     // gain for each axis... x, y, and z
-    const Eigen::Vector3d Kp { 0.7, 0.7, 0.5 };
+    const Eigen::Vector3d Kp { 0.6, 0.6, 0.5 };
 
     // velocity saturation [m/s]
     // max magnitude of the velocity vector
-    const float speed_saturation_ { 10.0 };
+    const float speed_saturation_ { 15.0 };
 
     Eigen::Vector3d measured_speed_;
 

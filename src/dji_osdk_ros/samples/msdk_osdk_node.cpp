@@ -13,6 +13,7 @@
 #include <std_msgs/UInt32.h>
 #include <future>
 #include <dji_osdk_ros/ObtainControlAuthority.h>
+#include <atomic>
 
 namespace osdk = dji_osdk_ros;
 
@@ -25,7 +26,9 @@ class MobileCommandHandler
 public:
     MobileCommandHandler(std::string name) :
         nh_(),
-        ac_("mission_planner", true)
+        ac_("mission_planner", true),
+        authority_check_thread_running_(false),
+        mission_active_(false)
     {
         // Initialize the action client
         ROS_INFO("Waiting for action server to start...");
@@ -33,12 +36,16 @@ public:
         ROS_INFO("Action server started, ready to receive commands.");
 
         // Subscribe to mobile data
-        fromMobileDataSub_ = nh_.subscribe("dji_osdk_ros/from_mobile_data", 10, 
-                                          &MobileCommandHandler::fromMobileDataSubCallback, this);
+        fromMobileDataSub_ = nh_.subscribe("dji_osdk_ros/from_mobile_data", 100,
+                                        &MobileCommandHandler::fromMobileDataSubCallback, this);
 
         drop_trigger_pub_ = nh_.advertise<std_msgs::UInt32>("drop_trigger", 1000);
 
         obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
+
+        // reset the variables for next time
+        authority_check_in_progress_.store(false);
+        has_authority_.store(true);
         
         command_handlers_ = {
             std::bind(&MobileCommandHandler::handleCommandA, this, std::placeholders::_1),
@@ -47,6 +54,18 @@ public:
             std::bind(&MobileCommandHandler::handleAbsoluteMission, this, std::placeholders::_1),
             std::bind(&MobileCommandHandler::handleRelativeMission, this, std::placeholders::_1)
         };
+
+        authority_check_thread_running_.store(true);
+        authority_check_thread_ = std::thread(&MobileCommandHandler::authorityCheckLoop, this);
+    }
+
+    ~MobileCommandHandler()
+    {
+        // Signal thread to stop and wait for it
+        authority_check_thread_running_.store(false);
+        if (authority_check_thread_.joinable()) {
+            authority_check_thread_.join();
+        }
     }
 
     // Define data structures for incoming requests
@@ -92,11 +111,51 @@ private:
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
     ros::ServiceClient obtain_ctrl_authority_client_;
+    std::atomic<bool> authority_check_in_progress_;
+    std::atomic<bool> has_authority_;
+    std::thread authority_check_thread_;
+    std::atomic<bool> authority_check_thread_running_;
+    std::atomic<bool> mission_active_;
+    std::mutex authority_mutex_;
     
-    // Constants
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
     const uint8_t DROP_FLAG { 42 };
+    const int OSDK_AUTHORITY_WAIT_TIME_S { 10 };
+    const double CHECK_CANCEL_MISSION_PERIOD_S { 1 };
+    const double CHECK_AUTHORITY_TIMER_S { 1 };
+
+    void authorityCheckLoop()
+    {
+        ros::Rate rate(1.0 / CHECK_AUTHORITY_TIMER_S);
+        while (authority_check_thread_running_.load() && ros::ok())
+        {
+            if (mission_active_.load())
+            {
+                auto should_cancel = false;
+                {
+                    std::lock_guard<std::mutex> lock(authority_mutex_);
+                    if (!authority_check_in_progress_.exchange(true))
+                    {
+                        bool has_authority = osdkHasAuthority();
+                        has_authority_.store(has_authority);
+                        should_cancel = !has_authority;
+                        authority_check_in_progress_.store(false);
+                    }
+                }
+
+                if (should_cancel)
+                {
+                    ROS_ERROR("Lost authority, cancelling mission");
+                    ac_.cancelGoal();
+                    mission_active_.store(false);
+                    // Wait a bit to ensure cancellation is processed
+                    ros::Duration(0.5).sleep();
+                }
+            }
+            rate.sleep();
+        }
+    }
 
     void fromMobileDataSubCallback(const dji_osdk_ros::MobileData::ConstPtr& fromMobileData)
     {
@@ -133,10 +192,9 @@ private:
         obtain_ctrl_authority.request.enable_obtain = true;
         std::future<bool> result = std::async(std::launch::async, &MobileCommandHandler::callAuthorityService, this, std::ref(obtain_ctrl_authority));
 
-        // Wait up to 10 seconds for a response
-        if (result.wait_for(std::chrono::seconds(10)) != std::future_status::ready)
+        if (result.wait_for(std::chrono::seconds(OSDK_AUTHORITY_WAIT_TIME_S)) != std::future_status::ready)
         {
-            ROS_ERROR("Service call timed out after 10 seconds.");
+            ROS_ERROR_STREAM("Service call timed out after " << OSDK_AUTHORITY_WAIT_TIME_S << " seconds.");
             return false;
         }
         if (!result.get())
@@ -276,30 +334,57 @@ private:
         runMissionServer(goal);
     }
 
+    void missionCompleteCallback(const actionlib::SimpleClientGoalState& state, const osdk::MissionResultConstPtr& result)
+    {
+        // reset the variables for next time
+        {
+            // TODO: be careful, this mutex has not been tested to be working
+            // if things break, remove this mutex
+            std::lock_guard<std::mutex> lock(authority_mutex_);
+            authority_check_in_progress_.store(false);
+            // assume we have authority on reset to not cancel a mission by accident
+            has_authority_.store(true);
+        }
+
+        if (state != actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            ROS_ERROR("Mission failed with state: %s, message: %s",
+                state.toString().c_str(), result->message.c_str());
+            return;
+        }
+        mission_active_.store(false);
+        ROS_INFO("Mission completed successfully: %s", result->message.c_str());
+    }
+
+    void activeCallback()
+    {
+        ROS_INFO("Goal just went active");
+        mission_active_.store(true);
+    }
+
+    void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)
+    {
+        // Keep this in case we want to log any data for feedback during missions
+    }
+
     void runMissionServer(const osdk::MissionGoal& goal)
     {
-        ROS_INFO("Sending mission goal to action server");
-        ac_.sendGoal(goal);
-
-        // Wait for the result
-        // TODO: add preemption to the missions (not working)
-        const auto finished_before_timeout = ac_.waitForResult(ros::Duration(200.0));
-        
-        if (!finished_before_timeout)
+        // handle mission preemption
+        if (ac_.getState().state_ == actionlib::SimpleClientGoalState::ACTIVE)
         {
-            ROS_ERROR("Timed out waiting for action server to complete mission.");
+            // Cancel the current mission
+            ROS_WARN("Preempting current mission with new request");
             ac_.cancelGoal();
-            return;
+            mission_active_.store(false);
+            // Small delay to ensure cancellation is processed
+            ros::Duration(0.5).sleep();
         }
 
-        const auto result = ac_.getResult();
-        if (!result->success)
-        {
-            ROS_ERROR("Mission failed: %s", result->message.c_str());
-            return;
-        }
-
-        ROS_INFO("Mission completed successfully: %s", result->message.c_str());
+        ROS_INFO("Sending mission goal to action server");
+        ac_.sendGoal(goal, std::bind(&MobileCommandHandler::missionCompleteCallback, this,
+            std::placeholders::_1, std::placeholders::_2),
+            std::bind(&MobileCommandHandler::activeCallback, this),
+            std::bind(&MobileCommandHandler::feedbackCallback, this, std::placeholders::_1));
     }
 };
 
