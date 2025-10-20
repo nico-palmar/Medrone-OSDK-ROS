@@ -13,7 +13,6 @@
 #include <std_msgs/UInt32.h>
 #include <future>
 #include <dji_osdk_ros/ObtainControlAuthority.h>
-#include <atomic>
 
 namespace osdk = dji_osdk_ros;
 
@@ -43,9 +42,7 @@ public:
 
         obtain_ctrl_authority_client_ = nh_.serviceClient<osdk::ObtainControlAuthority>("obtain_release_control_authority");
 
-        // reset the variables for next time
-        authority_check_in_progress_.store(false);
-        has_authority_.store(true);
+        has_authority_ = true;
         
         command_handlers_ = {
             std::bind(&MobileCommandHandler::handleCommandA, this, std::placeholders::_1),
@@ -55,14 +52,14 @@ public:
             std::bind(&MobileCommandHandler::handleRelativeMission, this, std::placeholders::_1)
         };
 
-        authority_check_thread_running_.store(true);
+        authority_check_thread_running_ = true;
         authority_check_thread_ = std::thread(&MobileCommandHandler::authorityCheckLoop, this);
     }
 
     ~MobileCommandHandler()
     {
         // Signal thread to stop and wait for it
-        authority_check_thread_running_.store(false);
+        authority_check_thread_running_ = false;
         if (authority_check_thread_.joinable()) {
             authority_check_thread_.join();
         }
@@ -111,12 +108,11 @@ private:
     actionlib::SimpleActionClient<osdk::MissionAction> ac_;
     std::vector<CommandHandler> command_handlers_;
     ros::ServiceClient obtain_ctrl_authority_client_;
-    std::atomic<bool> authority_check_in_progress_;
-    std::atomic<bool> has_authority_;
+    bool has_authority_ { true };
     std::thread authority_check_thread_;
-    std::atomic<bool> authority_check_thread_running_;
-    std::atomic<bool> mission_active_;
-    std::mutex authority_mutex_;
+    bool authority_check_thread_running_ { false };
+    bool mission_active_ { false };
+    std::shared_mutex authority_mutex_;
     
     const uint32_t MSDK_PASSWORD { 46000636 };
     const uint32_t UART_PASSWORD { 18922601 };
@@ -128,27 +124,23 @@ private:
     void authorityCheckLoop()
     {
         ros::Rate rate(1.0 / CHECK_AUTHORITY_TIMER_S);
-        while (authority_check_thread_running_.load() && ros::ok())
+        while (authority_check_thread_running_ && ros::ok())
         {
-            if (mission_active_.load())
+            // hold a write lock this whole time; things should not get updated in a weird partial state
+            // only one can hold the unique write lock at a time
+            std::unique_lock<std::shared_mutex> lock(authority_mutex_);
+            if (mission_active_)
             {
                 auto should_cancel = false;
-                {
-                    std::lock_guard<std::mutex> lock(authority_mutex_);
-                    if (!authority_check_in_progress_.exchange(true))
-                    {
-                        bool has_authority = osdkHasAuthority();
-                        has_authority_.store(has_authority);
-                        should_cancel = !has_authority;
-                        authority_check_in_progress_.store(false);
-                    }
-                }
+                // note that the function call below may be blocking
+                has_authority_ = osdkHasAuthority();
+                should_cancel = !has_authority_;
 
                 if (should_cancel)
                 {
                     ROS_ERROR("Lost authority, cancelling mission");
                     ac_.cancelGoal();
-                    mission_active_.store(false);
+                    mission_active_ = false;
                     // Wait a bit to ensure cancellation is processed
                     ros::Duration(0.5).sleep();
                 }
@@ -190,21 +182,25 @@ private:
     {
         osdk::ObtainControlAuthority obtain_ctrl_authority;
         obtain_ctrl_authority.request.enable_obtain = true;
-        std::future<bool> result = std::async(std::launch::async, &MobileCommandHandler::callAuthorityService, this, std::ref(obtain_ctrl_authority));
 
-        if (result.wait_for(std::chrono::seconds(OSDK_AUTHORITY_WAIT_TIME_S)) != std::future_status::ready)
+        const ros::Duration timeout{ OSDK_AUTHORITY_WAIT_TIME_S };
+        if (!obtain_ctrl_authority_client_.waitForExistence(timeout))
         {
-            ROS_ERROR_STREAM("Service call timed out after " << OSDK_AUTHORITY_WAIT_TIME_S << " seconds.");
+            ROS_ERROR_STREAM("Service 'obtain_release_control_authority' not available within "
+                            << OSDK_AUTHORITY_WAIT_TIME_S << " seconds.");
             return false;
         }
-        if (!result.get())
+
+        // service is called synchronously in thread, may block for some time
+        if (!obtain_ctrl_authority_client_.call(obtain_ctrl_authority))
         {
-            ROS_ERROR("Service call failed.");
+            ROS_ERROR("Service call to obtain_release_control_authority failed.");
             return false;
         }
+
         if (!obtain_ctrl_authority.response.result)
         {
-            ROS_ERROR("Service call has a result of false");
+            ROS_ERROR("Service call returned false result (no authority).");
             return false;
         }
 
@@ -266,10 +262,15 @@ private:
             return;
         }
 
-        if (!osdkHasAuthority())
         {
-            ROS_ERROR("Control authority is dead; ignoring message");
-            return;
+            // make extensible for future multiple readers. Doesn't really matter in this case though
+            // could also be a unique lock which waits to read the correct data
+            std::shared_lock<std::shared_mutex> lock(authority_mutex_);
+            if (!has_authority_)
+            {
+                ROS_ERROR("No control authority; ignoring message");
+                return;
+            }
         }
         
         AbsoluteMissionData mission_data;
@@ -304,10 +305,15 @@ private:
             return;
         }
 
-        if (!osdkHasAuthority())
         {
-            ROS_ERROR("Control authority is dead; ignoring message");
-            return;
+            // make extensible for future multiple readers. Doesn't really matter in this case though
+            // could also be a unique lock which waits to read the correct data
+            std::shared_lock<std::shared_mutex> lock(authority_mutex_);
+            if (!has_authority_)
+            {
+                ROS_ERROR("No control authority; ignoring message");
+                return;
+            }
         }
         
         RelativeMissionData mission_data;
@@ -338,12 +344,10 @@ private:
     {
         // reset the variables for next time
         {
-            // TODO: be careful, this mutex has not been tested to be working
-            // if things break, remove this mutex
-            std::lock_guard<std::mutex> lock(authority_mutex_);
-            authority_check_in_progress_.store(false);
+            std::unique_lock<std::shared_mutex> lock(authority_mutex_);
             // assume we have authority on reset to not cancel a mission by accident
-            has_authority_.store(true);
+            has_authority_ = true;
+            mission_active_ = false;
         }
 
         if (state != actionlib::SimpleClientGoalState::SUCCEEDED)
@@ -352,14 +356,16 @@ private:
                 state.toString().c_str(), result->message.c_str());
             return;
         }
-        mission_active_.store(false);
         ROS_INFO("Mission completed successfully: %s", result->message.c_str());
     }
 
     void activeCallback()
     {
         ROS_INFO("Goal just went active");
-        mission_active_.store(true);
+        {
+            std::unique_lock<std::shared_mutex> lock(authority_mutex_);
+            mission_active_ = true;
+        }
     }
 
     void feedbackCallback(const osdk::MissionFeedbackConstPtr& feedback)
@@ -375,7 +381,13 @@ private:
             // Cancel the current mission
             ROS_WARN("Preempting current mission with new request");
             ac_.cancelGoal();
-            mission_active_.store(false);
+            // reset the variables for next time
+            {
+                std::unique_lock<std::shared_mutex> lock(authority_mutex_);
+                // assume we have authority on reset to not cancel a mission by accident
+                has_authority_ = true;
+                mission_active_ = false;
+            }
             // Small delay to ensure cancellation is processed
             ros::Duration(0.5).sleep();
         }
